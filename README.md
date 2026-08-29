@@ -1,6 +1,10 @@
-# A 3D Game with Thinking NPCs
+# Quest Hero
 
-*Hackathon project brief*
+**A 3D game whose NPCs actually think.**
+
+Built for the [Agent Harness Hackathon](https://www.wemakedevs.org/hackathons/trueforge) — Bright Data, San Francisco, August 29 2026. Submission deadline 18:00 PDT.
+
+---
 
 ## Overview
 
@@ -27,3 +31,92 @@ The 3D game has to stand on its own. Smart NPCs are not a substitute for solid m
 ### 3. Using MCP to make NPCs smart about game mechanics
 
 Beyond outside knowledge, we want the characters to understand the game they live in. MCP is how we expose the game's own state and rules to the agents, so an NPC can reason about mechanics and help the player navigate them.
+
+---
+
+## The Harness: TrueForge
+
+The agent layer is built on [TrueForge](https://github.com/truefoundry/trueforge), TrueFoundry's open-source agent harness (MIT). We do not write our own agent loop — the harness runs it, and our job is the game and the tools we hand it.
+
+TrueForge is TypeScript/Node (>= 22.14), which is why the whole stack is TypeScript: the game, the MCP servers, and the harness wiring all speak the same language.
+
+```bash
+npx @truefoundry/trueforge@latest   # harness server, default http://localhost:8790
+npm i @truefoundry/trueforge-sdk    # what the game talks to
+```
+
+### One session per NPC
+
+A TrueForge *session* holds context and state across turns. That maps onto an NPC exactly: the blacksmith remembers the last three things you asked him, because he is one long-lived session, not a stateless prompt.
+
+```ts
+import { TrueForge } from '@truefoundry/trueforge-sdk';
+
+const client = new TrueForge({ baseUrl: process.env.TRUEFORGE_BASE_URL ?? 'http://localhost:8790' });
+
+// One session per NPC, created when the character spawns and kept for the run.
+const { data: session } = await client.sessions.create({
+  agent: { spec: { model: { name: /* from the model catalog */ }, instructions: BLACKSMITH_PERSONA } },
+});
+
+// A player talking to an NPC is a turn. Stream it so dialogue types out in-world.
+const stream = await client.sessions.createTurnStream(session.id, {
+  input: [{ type: 'user.message', content: playerLine }],
+});
+
+for await (const { data: event } of stream.withMetadata()) {
+  if (event.type === 'model.message.delta') renderDialogue(event.content ?? '');
+  if (event.type === 'turn.done') endDialogue(event.state.status);
+}
+```
+
+### What the harness gives us, and what we do with it
+
+| TrueForge capability | How Quest Hero uses it |
+| --- | --- |
+| MCP servers (incl. OAuth, remote) | Two of our own: game state/rules, and live web data |
+| Built-in tools + web search | NPC fallback for general world knowledge |
+| Sandboxed execution (Daytona) | Agent-written code never touches the game process |
+| Human approvals | The player approves before an NPC changes world state |
+| Subagents | A quest-giver delegates lookups without polluting its own context |
+| Sessions that survive reconnects | An NPC keeps its memory across a page refresh |
+| Any model provider | Swap per-NPC: a cheap model for a merchant, a strong one for a boss |
+
+Configuration lives in YAML catalogs (models, MCP servers, sandbox) and git-backed `SKILL.md` packs — so NPC personas and tool access are version-controlled, reviewable, and diffable rather than hardcoded.
+
+## The MCP servers we own
+
+**`quest-hero-world`** — the game exposed as tools. Reads: player inventory, position, quest state, faction standing, the rules of combat and crafting. Writes: give item, advance quest, set waypoint. Writes are the ones that go behind an approval gate.
+
+**`quest-hero-web`** — live web data via [Bright Data](https://brightdata.com), so a character can speak to what is true today. Scraper configuration is committed to the repo and reused by the agent automatically, and the pipeline is expected to notice when a target site changes and repair itself rather than silently going stale.
+
+## Design note: approval gates are a game mechanic
+
+The hackathon asks for an interface that shows what the agent is doing, what it is waiting on, and asks before the irreversible step. In a game that is not a modal dialog bolted on top — it is the NPC saying *"I can forge that, but it will cost your last ingot. Shall I?"* and waiting. The approval gate and the dialogue are the same thing.
+
+## Tracks
+
+| Track | Prize | Our angle |
+| --- | --- | --- |
+| **Best Use of the Agent Harness** | NVIDIA DGX Spark | Primary. Every NPC is a harness session — subagents, MCP, approvals, persistence all load-bearing, not a wrapper |
+| **Best use of Bright Data** | AirPods 4 | `quest-hero-web`: version-controlled scraper config, self-repairing pipeline feeding in-game dialogue |
+| **Best UI** | iPad | Approval gates as diegetic dialogue; the player can always see what a character is doing and waiting on |
+| **Best Code Quality** | Mac Mini | Every PR through [Qodo](https://www.qodo.ai) before merge — required for this track |
+| **Best blog post** | Keychron keyboard | Write-up of the build and what broke |
+
+## Stack
+
+- **Harness** — TrueForge (`@truefoundry/trueforge-sdk`)
+- **Game** — TypeScript, WebGL/3D in the browser
+- **Tools** — MCP servers for game state and live web data
+- **Data** — Bright Data
+- **Review** — Qodo on every PR
+- **Models** — provider-neutral via the TrueForge model catalog (OpenAI credits provided; Anthropic and Gemini also available)
+
+## Repo
+
+Open source, as the hackathon requires.
+
+## Status
+
+Early. The brief and architecture are settled; implementation starts now.

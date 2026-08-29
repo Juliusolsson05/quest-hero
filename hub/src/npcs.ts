@@ -20,6 +20,14 @@ export interface NpcSeed {
   bubbleTint: string;
   /** POI the NPC starts at */
   home: string;
+  /**
+   * Preferred model FQN (ported from game/src/npc.ts). Chosen per character:
+   * dialogue-only characters get the fast model, web-researching ones the
+   * stronger one. The harness catalog decides what actually exists.
+   */
+  model: string;
+  /** Whether this character can reach outside the game world (web connectors). */
+  webAccess?: boolean;
   persona: string;
   /** canned lines used when TrueForge stalls or is unreachable */
   fallbacks: string[];
@@ -44,13 +52,18 @@ export const NPC_SEEDS: NpcSeed[] = [
     role: 'blacksmith',
     bubbleTint: '#FFD3B6',
     home: 'forge',
+    model: 'openai/gpt-5-4-mini',
     persona:
       'You are Bran, a blacksmith in the town of Ashford. Blunt, warm underneath, ' +
       'economical with words — two or three sentences unless asked for detail. ' +
       "You can inspect the player's inventory and quest state with your tools, and " +
       'you should, rather than guessing at what they carry. You never invent items ' +
       'that are not in their inventory. Before you take something from a player or ' +
-      'change the world, you ask them plainly and wait for an answer.' +
+      'change the world, you ask them plainly and wait for an answer. ' +
+      'You know nothing of the world beyond Ashford and you have no way to find ' +
+      'out — you are a smith, not a herald. If asked about news, weather, or ' +
+      'anything outside this town, say so plainly and send them to Wren, the ' +
+      'herald, who trades in word from the far roads. Never guess at such things.' +
       KAWAII_RULE +
       WORLD_RULE,
     fallbacks: [
@@ -131,6 +144,8 @@ export const NPC_SEEDS: NpcSeed[] = [
     role: 'town herald',
     bubbleTint: '#B5E2FA',
     home: 'market',
+    model: 'openai/gpt-5-5',
+    webAccess: true,
     persona:
       'You are Wren, herald of Ashford, who trades in news. You are curious about ' +
       'the world beyond the town and you have tools that reach it. When a traveller ' +
@@ -216,6 +231,8 @@ export const NPC_SEEDS: NpcSeed[] = [
     role: 'shopkeep',
     bubbleTint: '#FFAAA5',
     home: 'market',
+    model: 'openai/gpt-5-4-mini',
+    webAccess: true,
     persona:
       'You are Suki, keeper of the little market stall in Ashford. Cheery, quick ' +
       'with numbers, a shameless haggler with a soft heart. You love naming prices ' +

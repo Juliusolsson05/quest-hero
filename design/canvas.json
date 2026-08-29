@@ -1,0 +1,15 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html", "title": "Title screen", "x": 0, "y": 0, "w": 1280, "h": 800 },
+    { "file": "HUD.dc.html", "title": "In-game HUD", "x": 1360, "y": 0, "w": 1280, "h": 800 },
+    { "file": "PauseMenu.dc.html", "title": "Pause menu", "x": 2720, "y": 0, "w": 1280, "h": 800 },
+    { "file": "Settings.dc.html", "title": "Settings", "x": 0, "y": 920, "w": 1280, "h": 800 },
+    { "file": "QuestBoard.dc.html", "title": "Quest board", "x": 1360, "y": 920, "w": 480, "h": 800 },
+    { "file": "Bubbles.dc.html", "title": "Dialog bubbles", "x": 1920, "y": 920, "w": 960, "h": 800 },
+    { "file": "Components.dc.html", "title": "Core kit", "x": 2960, "y": 920, "w": 1040, "h": 860 }
+  ],
+  "annotations": [
+    { "id": "kit-note", "x": 0, "y": -170, "w": 520, "text": "Quest Hero — Ashford · kawaii UI kit\nMatches the game's live CSS: Baloo 2, ink #35313f on cream #fffdf6, 2.5px outlines, hard offset shadows, pill radii.\nScreens on top; quest board, the bubble set and core components below — everything maps 1:1 onto the existing classes (.chip, .toast, .bub, #talkbar, #questpanel)." }
+  ],
+  "launch": { "view": "canvas" }
+}

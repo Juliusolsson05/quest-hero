@@ -1,0 +1,91 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&amp;display=swap">
+  <style>
+    body { margin: 0; font-family: "Baloo 2", "Trebuchet MS", system-ui, sans-serif; color: #35313f; }
+    a { color: #e2574f; } a:hover { color: #c9536b; }
+    .kbd { background: #35313f; color: #fffdf6; border-radius: 6px; padding: 1px 7px; font: 700 12px "Baloo 2", "Trebuchet MS", sans-serif; }
+    .m-btn { display: flex; align-items: center; gap: 12px; border: 2.5px solid #35313f; border-radius: 16px;
+             padding: 12px 18px; font-weight: 800; font-size: 17px; background: #fffdf6;
+             box-shadow: 0 4px 0 rgba(53,49,63,.16); cursor: pointer; }
+    .m-btn svg { flex-shrink: 0; }
+  </style>
+</helmet>
+<div style="position: relative; width: 1280px; height: 800px; overflow: hidden; background: #bfe6f7">
+
+  <!-- soft, dimmed village behind the menu -->
+  <svg viewBox="0 0 1280 800" width="1280" height="800" style="position: absolute; inset: 0; filter: saturate(.85)" aria-hidden="true">
+    <rect width="1280" height="440" fill="#bfe6f7"></rect>
+    <circle cx="170" cy="110" r="42" fill="#ffd977"></circle>
+    <g fill="#ffffff" opacity="0.85">
+      <ellipse cx="940" cy="120" rx="64" ry="24"></ellipse>
+      <ellipse cx="992" cy="108" rx="40" ry="18"></ellipse>
+    </g>
+    <path d="M0 440 Q 320 380 640 424 T 1280 416 V 800 H 0 Z" fill="#8fd3a0"></path>
+    <rect x="0" y="490" width="1280" height="310" fill="#6fc07e"></rect>
+    <g stroke="#35313f" stroke-width="4" stroke-linejoin="round">
+      <rect x="150" y="380" width="180" height="126" rx="14" fill="#fff3dd"></rect>
+      <path d="M132 392 L240 306 L348 392 Q240 366 132 392 Z" fill="#f49b3d"></path>
+      <rect x="980" y="400" width="160" height="108" rx="13" fill="#fffdf6"></rect>
+      <path d="M964 410 L1060 332 L1156 410 Q1060 386 964 410 Z" fill="#ff9d96"></path>
+      <rect x="700" y="428" width="14" height="42" rx="6" fill="#b98a5a"></rect>
+      <circle cx="707" cy="398" r="40" fill="#63bf95"></circle>
+    </g>
+  </svg>
+  <div style="position: absolute; inset: 0; background: rgba(53,49,63,.34)"></div>
+
+  <!-- pause card -->
+  <div style="position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 380px">
+    <!-- sleepy sun peeking over the card -->
+    <svg width="120" height="66" viewBox="0 0 120 66" style="position: absolute; top: -58px; right: 26px" aria-hidden="true">
+      <circle cx="60" cy="52" r="40" fill="#ffd977" stroke="#35313f" stroke-width="4"></circle>
+      <path d="M42 44 q6 -6 12 0" stroke="#35313f" stroke-width="4" stroke-linecap="round" fill="none"></path>
+      <path d="M66 44 q6 -6 12 0" stroke="#35313f" stroke-width="4" stroke-linecap="round" fill="none"></path>
+      <ellipse cx="38" cy="54" rx="6" ry="4" fill="#ffb3ab"></ellipse>
+      <ellipse cx="82" cy="54" rx="6" ry="4" fill="#ffb3ab"></ellipse>
+    </svg>
+
+    <div style="background: #fffdf6; border: 3px solid #35313f; border-radius: 24px; overflow: hidden; box-shadow: 0 9px 0 rgba(53,49,63,.28)">
+      <div style="display: flex; align-items: center; justify-content: center; gap: 10px; background: #ffe1b8; border-bottom: 2.5px solid #35313f; padding: 14px">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#35313f" stroke-width="2.6" stroke-linecap="round"><path d="M9 5 v14"></path><path d="M15 5 v14"></path></svg>
+        <div style="font-weight: 800; font-size: 24px; letter-spacing: .01em">paused</div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 12px; padding: 20px 20px 16px">
+        <div class="m-btn" style="background: #a8e6cf">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="#35313f"><path d="M7 4 L20 12 L7 20 Z"></path></svg>
+          <span>resume</span>
+        </div>
+        <div class="m-btn">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#35313f" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3 h11 a2 2 0 0 1 2 2 v14 a2 2 0 0 1 -2 2 H7"></path><path d="M7 3 a2 2 0 0 0 -2 2 v14 a2 2 0 0 0 2 2"></path><path d="M9 8 h7"></path><path d="M9 12 h7"></path><path d="M9 16 h4"></path></svg>
+          <span>quest log</span>
+          <span style="margin-left: auto; font-size: 12px; background: #ffaaa5; color: #fffdf6; border-radius: 999px; padding: 1px 9px">2</span>
+        </div>
+        <div class="m-btn">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#35313f" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"></circle><path d="M19 12 a7 7 0 0 0 -.14 -1.4 l2 -1.55 -2 -3.46 -2.35 .95 A7 7 0 0 0 14 5.1 L13.6 2.6 h-3.2 L10 5.1 a7 7 0 0 0 -2.5 1.44 l-2.36 -.95 -2 3.46 2 1.55 A7 7 0 0 0 5 12 c0 .47 .05 .94 .14 1.4 l-2 1.55 2 3.46 2.35 -.95 A7 7 0 0 0 10 18.9 l.4 2.5 h3.2 l.4 -2.5 a7 7 0 0 0 2.5 -1.44 l2.35 .95 2 -3.46 -2 -1.55 c.09 -.46 .15 -.93 .15 -1.4 Z"></path></svg>
+          <span>settings</span>
+        </div>
+        <div class="m-btn" style="background: #ffd9d5">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#35313f" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4 H6 a2 2 0 0 0 -2 2 v12 a2 2 0 0 0 2 2 h8"></path><path d="M10 12 h10"></path><path d="M17 8 l4 4 -4 4"></path></svg>
+          <span>back to title</span>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: center; gap: 8px; padding: 0 20px 16px; font-weight: 600; font-size: 12.5px; color: #8d8496">
+        <span><span class="kbd">Esc</span> resume</span>
+        <span style="opacity:.5">·</span>
+        <span>the village keeps living while you rest ✨</span>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

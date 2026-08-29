@@ -1,0 +1,131 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&amp;display=swap">
+  <style>
+    body { margin: 0; font-family: "Baloo 2", "Trebuchet MS", system-ui, sans-serif; color: #35313f; }
+    a { color: #e2574f; } a:hover { color: #c9536b; }
+    .kbd { background: #35313f; color: #fffdf6; border-radius: 6px; padding: 2px 9px;
+           font: 700 13px "Baloo 2", "Trebuchet MS", sans-serif; box-shadow: 0 2px 0 rgba(53,49,63,.35); }
+    @keyframes floaty { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
+    @keyframes bob { 0%,100% { transform: translateY(0) rotate(-2deg); } 50% { transform: translateY(-5px) rotate(2deg); } }
+    @keyframes twinkle { 0%,100% { opacity: .9; transform: scale(1); } 50% { opacity: .35; transform: scale(.72); } }
+  </style>
+</helmet>
+<div style="position: relative; width: 1280px; height: 800px; overflow: hidden; background: linear-gradient(180deg, #bfe6f7 0%, #ffe9d2 78%, #ffd9d5 100%)">
+
+  <!-- backdrop: sun, clouds, hills, the village of Ashford, the arrival boat -->
+  <svg viewBox="0 0 1280 800" width="1280" height="800" style="position: absolute; inset: 0" aria-hidden="true">
+    <circle cx="1092" cy="128" r="74" fill="#ffe9b0" opacity="0.55"></circle>
+    <circle cx="1092" cy="128" r="52" fill="#ffd977"></circle>
+    <circle cx="1074" cy="122" r="5" fill="#35313f"></circle>
+    <circle cx="1110" cy="122" r="5" fill="#35313f"></circle>
+    <path d="M1080 140 q12 9 24 0" stroke="#35313f" stroke-width="4" stroke-linecap="round" fill="none"></path>
+    <circle cx="1064" cy="136" r="7" fill="#ffb3ab" opacity="0.85"></circle>
+    <circle cx="1120" cy="136" r="7" fill="#ffb3ab" opacity="0.85"></circle>
+
+    <g fill="#ffffff" opacity="0.92">
+      <g style="animation: floaty 7s ease-in-out infinite">
+        <ellipse cx="220" cy="130" rx="78" ry="30"></ellipse>
+        <ellipse cx="288" cy="118" rx="52" ry="24"></ellipse>
+        <ellipse cx="162" cy="116" rx="44" ry="20"></ellipse>
+      </g>
+      <g style="animation: floaty 9s ease-in-out infinite reverse">
+        <ellipse cx="820" cy="86" rx="64" ry="24"></ellipse>
+        <ellipse cx="874" cy="76" rx="40" ry="18"></ellipse>
+      </g>
+      <ellipse cx="520" cy="200" rx="46" ry="16" opacity="0.6"></ellipse>
+    </g>
+
+    <path d="M0 560 Q 200 470 430 540 T 900 530 T 1280 545 V 800 H 0 Z" fill="#b7e4c4"></path>
+    <path d="M0 620 Q 260 545 560 605 T 1280 600 V 800 H 0 Z" fill="#8fd3a0"></path>
+
+    <!-- houses -->
+    <g stroke="#35313f" stroke-width="4" stroke-linejoin="round">
+      <g>
+        <rect x="180" y="470" width="132" height="96" rx="12" fill="#fffdf6"></rect>
+        <path d="M164 478 L246 408 L328 478 Q246 452 164 478 Z" fill="#ff9d96"></path>
+        <rect x="230" y="512" width="34" height="54" rx="10" fill="#d08b4a"></rect>
+        <circle cx="205" cy="502" r="12" fill="#ffe1b8"></circle>
+      </g>
+      <g>
+        <rect x="470" y="450" width="150" height="112" rx="12" fill="#fff3dd"></rect>
+        <path d="M452 458 L545 380 L638 458 Q545 432 452 458 Z" fill="#f49b3d"></path>
+        <rect x="498" y="486" width="30" height="26" rx="8" fill="#bfe6f7"></rect>
+        <rect x="562" y="486" width="30" height="26" rx="8" fill="#bfe6f7"></rect>
+        <rect x="528" y="508" width="36" height="54" rx="10" fill="#b06a4a"></rect>
+      </g>
+      <g>
+        <rect x="905" y="472" width="120" height="90" rx="12" fill="#fffdf6"></rect>
+        <path d="M890 480 L965 414 L1040 480 Q965 456 890 480 Z" fill="#c9536b"></path>
+        <rect x="948" y="506" width="32" height="56" rx="10" fill="#a9825b"></rect>
+      </g>
+    </g>
+
+    <!-- trees + bushes -->
+    <g stroke="#35313f" stroke-width="4">
+      <rect x="392" y="512" width="14" height="40" rx="6" fill="#b98a5a"></rect>
+      <circle cx="399" cy="486" r="38" fill="#63bf95"></circle>
+      <rect x="1120" y="520" width="14" height="38" rx="6" fill="#b98a5a"></rect>
+      <circle cx="1127" cy="494" r="34" fill="#5faf6a"></circle>
+      <ellipse cx="70" cy="590" rx="46" ry="28" fill="#a8e6cf"></ellipse>
+    </g>
+    <g fill="#ffb7d5">
+      <circle cx="150" cy="612" r="6"></circle><circle cx="700" cy="612" r="6"></circle><circle cx="1210" cy="632" r="6"></circle>
+    </g>
+    <g fill="#ffe08a">
+      <circle cx="180" cy="626" r="5"></circle><circle cx="672" cy="628" r="5"></circle><circle cx="1180" cy="618" r="5"></circle>
+    </g>
+
+    <!-- water + arrival boat -->
+    <path d="M0 716 Q 320 690 640 712 T 1280 710 V 800 H 0 Z" fill="#9ed7f0"></path>
+    <path d="M0 736 Q 320 714 640 732 T 1280 730" stroke="#ffffff" stroke-width="5" fill="none" opacity="0.55" stroke-linecap="round"></path>
+    <g style="animation: bob 4.5s ease-in-out infinite; transform-origin: 640px 740px">
+      <path d="M560 726 L720 726 L692 770 Q640 784 588 770 Z" fill="#b06a4a" stroke="#35313f" stroke-width="4" stroke-linejoin="round"></path>
+      <rect x="632" y="648" width="10" height="80" rx="4" fill="#35313f"></rect>
+      <path d="M642 654 Q 706 674 642 706 Z" fill="#ffaaa5" stroke="#35313f" stroke-width="4" stroke-linejoin="round"></path>
+    </g>
+
+    <!-- sparkles -->
+    <g fill="#ffffff">
+      <path d="M340 250 l6 14 14 6 -14 6 -6 14 -6 -14 -14 -6 14 -6 Z" style="animation: twinkle 2.6s ease-in-out infinite"></path>
+      <path d="M950 220 l5 12 12 5 -12 5 -5 12 -5 -12 -12 -5 12 -5 Z" style="animation: twinkle 3.4s ease-in-out infinite 1s"></path>
+      <path d="M770 320 l4 10 10 4 -10 4 -4 10 -4 -10 -10 -4 10 -4 Z" style="animation: twinkle 3s ease-in-out infinite .4s"></path>
+    </g>
+  </svg>
+
+  <!-- title stack -->
+  <div style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 14px; padding-top: 132px; text-align: center">
+    <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(255,253,246,.94); border: 2.5px solid #35313f; border-radius: 999px; padding: 5px 18px; font-weight: 800; font-size: 15px; letter-spacing: .12em; text-transform: uppercase; box-shadow: 0 4px 0 rgba(53,49,63,.14)">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#e2574f" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21 V10 l9 -6 9 6 v11"></path><path d="M9 21 v-6 a3 3 0 0 1 6 0 v6"></path></svg>
+      <span>Ashford</span>
+    </div>
+    <h1 style="margin: 0; font-size: 92px; line-height: 1; font-weight: 800; letter-spacing: -0.015em; color: #35313f; text-shadow: 0 5px 0 rgba(255,255,255,.65)">Quest Hero</h1>
+    <div style="font-weight: 700; font-size: 19px; color: #7a6f85">a tiny village that lives on real data</div>
+
+    <div style="display: flex; align-items: center; gap: 10px; margin-top: 10px; font-weight: 600; font-size: 14px; color: #6d6577">
+      <span class="kbd">W</span><span class="kbd">A</span><span class="kbd">S</span><span class="kbd">D</span><span>move</span>
+      <span style="opacity:.4">·</span>
+      <span class="kbd">Shift</span><span>run</span>
+      <span style="opacity:.4">·</span>
+      <span class="kbd">E</span><span>talk</span>
+    </div>
+
+    <div style="margin-top: 18px; display: flex; flex-direction: column; align-items: center; gap: 10px">
+      <div style="display: inline-flex; align-items: center; gap: 10px; background: #e2574f; color: #fffdf6; border: 3px solid #35313f; border-radius: 999px; padding: 13px 34px; font-weight: 800; font-size: 21px; box-shadow: 0 6px 0 rgba(53,49,63,.22); cursor: pointer">
+        <span>step off the boat</span>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="#fffdf6"><path d="M12 2 l2.2 5.6 L20 10 l-5.8 2.4 L12 18 l-2.2 -5.6 L4 10 l5.8 -2.4 Z"></path></svg>
+      </div>
+      <div style="background: rgba(255,253,246,.9); border-radius: 999px; padding: 3px 14px; font-weight: 700; font-size: 13px; color: #a4666e">click anywhere to begin</div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

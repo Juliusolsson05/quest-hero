@@ -1,0 +1,155 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&amp;display=swap">
+  <style>
+    body { margin: 0; font-family: "Baloo 2", "Trebuchet MS", system-ui, sans-serif; color: #35313f; }
+    a { color: #e2574f; } a:hover { color: #c9536b; }
+    .sec { border: 2px solid #e4d8c8; border-radius: 16px; background: #fffdf6; padding: 13px 16px;
+           display: flex; flex-direction: column; gap: 11px; }
+    .sec-label { font-weight: 800; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: #a4666e; }
+    .btn { display: inline-flex; align-items: center; gap: 8px; border: 2.5px solid #35313f; border-radius: 999px;
+           padding: 7px 20px; font-weight: 800; font-size: 15px; background: #fffdf6;
+           box-shadow: 0 4px 0 rgba(53,49,63,.18); cursor: pointer; }
+    .chip { background: rgba(255,253,246,.92); border: 2px solid #35313f; border-radius: 999px;
+            padding: 3px 13px; font-weight: 700; font-size: 13.5px; box-shadow: 0 3px 0 rgba(53,49,63,.14); }
+    .kbd { background: #35313f; color: #fffdf6; border-radius: 6px; padding: 1px 8px; font: 700 13px "Baloo 2", "Trebuchet MS", sans-serif; }
+    .pill { font-size: 11px; font-weight: 700; color: #fffdf6; border-radius: 999px; padding: 1px 9px; letter-spacing: .04em; }
+    .swatch { display: flex; flex-direction: column; gap: 4px; align-items: center; font-weight: 700; font-size: 10.5px; color: #6d6577; }
+    .swatch i { width: 44px; height: 44px; border: 2.5px solid #35313f; border-radius: 14px; box-shadow: 0 3px 0 rgba(53,49,63,.14); }
+  </style>
+</helmet>
+<div style="width: 1040px; height: 860px; overflow: hidden; background: #f7efe2; background-image: radial-gradient(rgba(53,49,63,.07) 1.6px, transparent 1.6px); background-size: 26px 26px; padding: 24px 30px; display: flex; flex-direction: column; gap: 16px">
+
+  <div style="display: flex; align-items: baseline; gap: 12px">
+    <div style="font-weight: 800; font-size: 24px">core kit</div>
+    <div style="font-weight: 600; font-size: 13.5px; color: #8d8496">ink 2.5px outlines · hard offset shadows · pill radii · press = drop 2px, lose the shadow</div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px">
+
+    <!-- buttons -->
+    <div class="sec">
+      <span class="sec-label">buttons</span>
+      <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center">
+        <span class="btn" style="background: #a8e6cf">accept</span>
+        <span class="btn">quest log</span>
+        <span class="btn" style="background: #e2574f; color: #fffdf6">step off the boat</span>
+        <span class="btn" style="background: #ffd9d5">leave</span>
+        <span class="btn" style="opacity: .45; box-shadow: none">locked</span>
+      </div>
+      <div style="display: flex; gap: 12px; align-items: center">
+        <span class="btn" style="background: #a8e6cf; transform: translateY(3px); box-shadow: none">accept</span>
+        <span style="font-weight: 600; font-size: 12.5px; color: #8d8496">← pressed: translateY(2px), shadow off</span>
+      </div>
+    </div>
+
+    <!-- chips + pills -->
+    <div class="sec">
+      <span class="sec-label">hud chips &amp; state pills</span>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center">
+        <span class="chip">☀️ clear 18°C</span>
+        <span class="chip">🌙 22:10 SF</span>
+        <span class="chip" style="opacity: .65">🟢 hub</span>
+        <span class="chip" style="opacity: .65">⚪ waking the village…</span>
+      </div>
+      <div style="display: flex; gap: 8px; align-items: center">
+        <span class="pill" style="background: #ffaaa5">new</span>
+        <span class="pill" style="background: #63bf95">active</span>
+        <span class="pill" style="background: #b9bfc7">done</span>
+        <span style="font-weight: 600; font-size: 12.5px; color: #8d8496">quest states</span>
+      </div>
+    </div>
+
+    <!-- toast + prompt -->
+    <div class="sec">
+      <span class="sec-label">toast &amp; interact prompt</span>
+      <div style="display: flex; flex-direction: column; gap: 9px; align-items: flex-start">
+        <div style="background: rgba(255,253,246,.95); border: 2px solid #35313f; border-radius: 14px; padding: 7px 13px; font-weight: 600; font-size: 13.5px; box-shadow: 0 4px 0 rgba(53,49,63,.14)">✨ quest accepted — The Rumor Mill</div>
+        <div style="background: rgba(255,253,246,.95); border: 2px solid #35313f; border-radius: 999px; padding: 7px 16px; font-weight: 700; box-shadow: 0 4px 0 rgba(53,49,63,.14)"><span class="kbd">E</span> talk to Bran</div>
+      </div>
+    </div>
+
+    <!-- input -->
+    <div class="sec">
+      <span class="sec-label">talk input</span>
+      <div style="display: flex; flex-direction: column; gap: 9px">
+        <div style="border: 2px solid #d9cfc4; background: #ffffff; border-radius: 12px; padding: 7px 12px; font-weight: 600; font-size: 14.5px; color: #8d8496">ask them anything…</div>
+        <div style="display: flex; align-items: center; gap: 10px; border: 2px solid #ffaaa5; background: #ffffff; border-radius: 12px; padding: 7px 12px; font-weight: 600; font-size: 14.5px">
+          <span style="flex-grow: 1">Any rumors from the coast|</span>
+          <span style="font-weight: 600; font-size: 12px; color: #8d8496">focused</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- controls -->
+    <div class="sec">
+      <span class="sec-label">controls</span>
+      <div style="display: flex; align-items: center; gap: 20px; flex-wrap: wrap">
+        <div style="display: flex; align-items: center; gap: 8px">
+          <div style="position: relative; width: 54px; height: 30px; border: 2.5px solid #35313f; border-radius: 999px; background: #a8e6cf">
+            <div style="position: absolute; right: 2px; top: 50%; transform: translateY(-50%); width: 22px; height: 22px; background: #fffdf6; border: 2.5px solid #35313f; border-radius: 999px"></div>
+          </div>
+          <div style="position: relative; width: 54px; height: 30px; border: 2.5px solid #35313f; border-radius: 999px; background: #f0e7da">
+            <div style="position: absolute; left: 2px; top: 50%; transform: translateY(-50%); width: 22px; height: 22px; background: #fffdf6; border: 2.5px solid #35313f; border-radius: 999px"></div>
+          </div>
+        </div>
+        <div style="position: relative; width: 190px; height: 14px; border: 2px solid #35313f; border-radius: 999px; background: #f0e7da">
+          <div style="position: absolute; left: 0; top: 0; bottom: 0; width: 62%; background: #a8e6cf; border-radius: 999px; border-right: 2px solid #35313f"></div>
+          <div style="position: absolute; left: 62%; top: 50%; transform: translate(-50%, -50%); width: 24px; height: 24px; background: #fffdf6; border: 2.5px solid #35313f; border-radius: 999px; box-shadow: 0 3px 0 rgba(53,49,63,.2)"></div>
+        </div>
+        <div style="display: flex; gap: 7px">
+          <span style="border: 2px solid #35313f; border-radius: 999px; padding: 3px 13px; font-weight: 700; font-size: 13px; background: #fffdf6">cozy</span>
+          <span style="border: 2px solid #35313f; border-radius: 999px; padding: 3px 13px; font-weight: 700; font-size: 13px; background: #ffe1b8; box-shadow: 0 3px 0 rgba(53,49,63,.16)">quick</span>
+          <span style="border: 2px solid #35313f; border-radius: 999px; padding: 3px 13px; font-weight: 700; font-size: 13px; background: #fffdf6">instant</span>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px">
+        <span class="kbd">W</span><span class="kbd">A</span><span class="kbd">S</span><span class="kbd">D</span><span class="kbd">Shift</span><span class="kbd">E</span><span class="kbd">Esc</span>
+        <span style="font-weight: 600; font-size: 12.5px; color: #8d8496">key caps</span>
+      </div>
+    </div>
+
+    <!-- type -->
+    <div class="sec">
+      <span class="sec-label">type · Baloo 2</span>
+      <div style="display: flex; flex-direction: column; gap: 2px">
+        <div style="font-weight: 800; font-size: 26px; line-height: 1.15">display 800 — Quest Hero</div>
+        <div style="font-weight: 800; font-size: 16px">heading 800 · 16 — quest board</div>
+        <div style="font-weight: 600; font-size: 15px; line-height: 1.35">body 600 · 15/1.35 — the ravens say rain by dusk</div>
+        <div style="font-weight: 700; font-size: 11px; letter-spacing: .05em; text-transform: uppercase; color: #a4666e">label 700 · 11 caps — talking to bran</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- palette -->
+  <div class="sec">
+    <span class="sec-label">palette</span>
+    <div style="display: flex; gap: 13px; flex-wrap: wrap">
+      <span class="swatch"><i style="background:#35313f"></i>ink 35313f</span>
+      <span class="swatch"><i style="background:#fffdf6"></i>cream fffdf6</span>
+      <span class="swatch"><i style="background:#fffbf0"></i>paper fffbf0</span>
+      <span class="swatch"><i style="background:#ffe1b8"></i>peach ffe1b8</span>
+      <span class="swatch"><i style="background:#ffaaa5"></i>coral ffaaa5</span>
+      <span class="swatch"><i style="background:#e2574f"></i>hero e2574f</span>
+      <span class="swatch"><i style="background:#ffd9d5"></i>blush ffd9d5</span>
+      <span class="swatch"><i style="background:#a8e6cf"></i>mint a8e6cf</span>
+      <span class="swatch"><i style="background:#63bf95"></i>leaf 63bf95</span>
+      <span class="swatch"><i style="background:#bfe6f7"></i>sky bfe6f7</span>
+      <span class="swatch"><i style="background:#ffe08a"></i>gold ffe08a</span>
+      <span class="swatch"><i style="background:#d08b4a"></i>bran d08b4a</span>
+      <span class="swatch"><i style="background:#6aa9d0"></i>wren 6aa9d0</span>
+      <span class="swatch"><i style="background:#6d6577"></i>muted 6d6577</span>
+      <span class="swatch"><i style="background:#e4d8c8"></i>line e4d8c8</span>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

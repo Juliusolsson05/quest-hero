@@ -1,0 +1,149 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&amp;display=swap">
+  <style>
+    body { margin: 0; font-family: "Baloo 2", "Trebuchet MS", system-ui, sans-serif; color: #35313f; }
+    a { color: #e2574f; } a:hover { color: #c9536b; }
+    .s-label { font-weight: 700; font-size: 14.5px; }
+    .s-hint { font-weight: 600; font-size: 12px; color: #8d8496; }
+    .track { position: relative; height: 14px; border: 2px solid #35313f; border-radius: 999px; background: #f0e7da; flex-grow: 1; }
+    .fill { position: absolute; left: 0; top: 0; bottom: 0; background: #a8e6cf; border-radius: 999px; border-right: 2px solid #35313f; }
+    .knob { position: absolute; top: 50%; transform: translate(-50%, -50%); width: 24px; height: 24px;
+            background: #fffdf6; border: 2.5px solid #35313f; border-radius: 999px; box-shadow: 0 3px 0 rgba(53,49,63,.2); }
+    .seg { border: 2px solid #35313f; border-radius: 999px; padding: 4px 15px; font-weight: 700; font-size: 13.5px;
+           background: #fffdf6; cursor: pointer; }
+    .seg.on { background: #ffe1b8; box-shadow: 0 3px 0 rgba(53,49,63,.16); }
+    .model { display: inline-flex; align-items: center; gap: 7px; border: 2px solid #35313f; border-radius: 999px;
+             background: #fffdf6; padding: 4px 12px; font-weight: 700; font-size: 13px; box-shadow: 0 3px 0 rgba(53,49,63,.14); }
+  </style>
+</helmet>
+<div style="position: relative; width: 1280px; height: 800px; overflow: hidden; background: #bfe6f7">
+
+  <!-- dimmed backdrop -->
+  <svg viewBox="0 0 1280 800" width="1280" height="800" style="position: absolute; inset: 0; filter: saturate(.85)" aria-hidden="true">
+    <rect width="1280" height="440" fill="#bfe6f7"></rect>
+    <g fill="#ffffff" opacity="0.85">
+      <ellipse cx="280" cy="110" rx="64" ry="24"></ellipse>
+      <ellipse cx="332" cy="98" rx="40" ry="18"></ellipse>
+      <ellipse cx="1020" cy="150" rx="52" ry="20"></ellipse>
+    </g>
+    <path d="M0 440 Q 320 380 640 424 T 1280 416 V 800 H 0 Z" fill="#8fd3a0"></path>
+    <rect x="0" y="490" width="1280" height="310" fill="#6fc07e"></rect>
+    <g stroke="#35313f" stroke-width="4" stroke-linejoin="round">
+      <rect x="1000" y="390" width="170" height="116" rx="14" fill="#fff3dd"></rect>
+      <path d="M984 400 L1085 318 L1186 400 Q1085 376 984 400 Z" fill="#c9536b"></path>
+      <rect x="120" y="430" width="14" height="42" rx="6" fill="#b98a5a"></rect>
+      <circle cx="127" cy="400" r="40" fill="#63bf95"></circle>
+    </g>
+  </svg>
+  <div style="position: absolute; inset: 0; background: rgba(53,49,63,.34)"></div>
+
+  <!-- settings card -->
+  <div style="position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 660px; background: #fffdf6; border: 3px solid #35313f; border-radius: 24px; overflow: hidden; box-shadow: 0 9px 0 rgba(53,49,63,.28)">
+    <div style="display: flex; align-items: center; gap: 10px; background: #ffe1b8; border-bottom: 2.5px solid #35313f; padding: 12px 18px">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#35313f" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"></circle><path d="M19 12 a7 7 0 0 0 -.14 -1.4 l2 -1.55 -2 -3.46 -2.35 .95 A7 7 0 0 0 14 5.1 L13.6 2.6 h-3.2 L10 5.1 a7 7 0 0 0 -2.5 1.44 l-2.36 -.95 -2 3.46 2 1.55 A7 7 0 0 0 5 12 c0 .47 .05 .94 .14 1.4 l-2 1.55 2 3.46 2.35 -.95 A7 7 0 0 0 10 18.9 l.4 2.5 h3.2 l.4 -2.5 a7 7 0 0 0 2.5 -1.44 l2.35 .95 2 -3.46 -2 -1.55 c.09 -.46 .15 -.93 .15 -1.4 Z"></path></svg>
+      <div style="font-weight: 800; font-size: 21px">settings</div>
+      <div style="margin-left: auto; width: 32px; height: 32px; display: grid; place-items: center; background: #fffdf6; border: 2px solid #35313f; border-radius: 999px; box-shadow: 0 3px 0 rgba(53,49,63,.16); cursor: pointer">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#35313f" stroke-width="3" stroke-linecap="round"><path d="M5 5 L19 19"></path><path d="M19 5 L5 19"></path></svg>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; padding: 18px 20px 6px">
+      <!-- sound -->
+      <div style="display: flex; flex-direction: column; gap: 12px; border: 2px solid #e4d8c8; border-radius: 16px; background: #fffbf0; padding: 13px 15px">
+        <div style="display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 12px; letter-spacing: .09em; text-transform: uppercase; color: #a4666e">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a4666e" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 L6 9 H3 v6 h3 l5 4 Z" fill="#a4666e"></path><path d="M15 9 a4 4 0 0 1 0 6"></path><path d="M18 6.5 a8 8 0 0 1 0 11"></path></svg>
+          <span>sound</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 5px">
+          <div style="display: flex; justify-content: space-between"><span class="s-label">music</span><span class="s-hint">70%</span></div>
+          <div style="display: flex; align-items: center; height: 24px"><div class="track"><div class="fill" style="width: 70%"></div><div class="knob" style="left: 70%"></div></div></div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 5px">
+          <div style="display: flex; justify-content: space-between"><span class="s-label">effects</span><span class="s-hint">85%</span></div>
+          <div style="display: flex; align-items: center; height: 24px"><div class="track"><div class="fill" style="width: 85%"></div><div class="knob" style="left: 85%"></div></div></div>
+        </div>
+      </div>
+
+      <!-- camera -->
+      <div style="display: flex; flex-direction: column; gap: 12px; border: 2px solid #e4d8c8; border-radius: 16px; background: #fffbf0; padding: 13px 15px">
+        <div style="display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 12px; letter-spacing: .09em; text-transform: uppercase; color: #a4666e">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a4666e" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="13" height="11" rx="3"></rect><path d="M16 11 l5 -3 v9 l-5 -3 Z" fill="#a4666e"></path></svg>
+          <span>camera</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 5px">
+          <div style="display: flex; justify-content: space-between"><span class="s-label">look sensitivity</span><span class="s-hint">55%</span></div>
+          <div style="display: flex; align-items: center; height: 24px"><div class="track"><div class="fill" style="width: 55%"></div><div class="knob" style="left: 55%"></div></div></div>
+        </div>
+        <div style="display: flex; align-items: center; justify-content: space-between">
+          <div style="display: flex; flex-direction: column"><span class="s-label">invert Y</span><span class="s-hint">for upside-down heroes</span></div>
+          <div style="position: relative; width: 54px; height: 30px; border: 2.5px solid #35313f; border-radius: 999px; background: #f0e7da">
+            <div style="position: absolute; left: 2px; top: 50%; transform: translateY(-50%); width: 22px; height: 22px; background: #fffdf6; border: 2.5px solid #35313f; border-radius: 999px"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- dialogue -->
+      <div style="display: flex; flex-direction: column; gap: 12px; border: 2px solid #e4d8c8; border-radius: 16px; background: #fffbf0; padding: 13px 15px">
+        <div style="display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 12px; letter-spacing: .09em; text-transform: uppercase; color: #a4666e">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a4666e" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12 a8 8 0 0 1 -8 8 H4 l2.4 -2.9 A8 8 0 1 1 21 12 Z"></path></svg>
+          <span>dialogue</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 7px">
+          <span class="s-label">text speed</span>
+          <div style="display: flex; gap: 8px">
+            <span class="seg">cozy</span>
+            <span class="seg on">quick</span>
+            <span class="seg">instant</span>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; justify-content: space-between">
+          <div style="display: flex; flex-direction: column"><span class="s-label">bubble tints</span><span class="s-hint">each villager speaks in color</span></div>
+          <div style="position: relative; width: 54px; height: 30px; border: 2.5px solid #35313f; border-radius: 999px; background: #a8e6cf">
+            <div style="position: absolute; right: 2px; top: 50%; transform: translateY(-50%); width: 22px; height: 22px; background: #fffdf6; border: 2.5px solid #35313f; border-radius: 999px"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- villager brains -->
+      <div style="display: flex; flex-direction: column; gap: 11px; border: 2px solid #e4d8c8; border-radius: 16px; background: #fffbf0; padding: 13px 15px">
+        <div style="display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 12px; letter-spacing: .09em; text-transform: uppercase; color: #a4666e">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a4666e" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 a5.5 5.5 0 0 0 -5.5 5.5 c0 1.2 .3 2.1 -.5 3.2 L4.5 14 H6 v2.5 A2.5 2.5 0 0 0 8.5 19 H10 v2"></path><path d="M12 3 a6.5 6.5 0 0 1 6.5 6.5 c0 2.4 -1.2 4 -2.5 5.3 V21"></path></svg>
+          <span>villager brains</span>
+        </div>
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px">
+          <div style="display: flex; align-items: center; gap: 9px">
+            <span style="width: 22px; height: 22px; background: #d08b4a; border: 2px solid #35313f; border-radius: 999px"></span>
+            <div style="display: flex; flex-direction: column"><span class="s-label">Bran</span><span class="s-hint">blacksmith</span></div>
+          </div>
+          <span class="model">gpt-5 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#35313f" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9 l7 7 7 -7"></path></svg></span>
+        </div>
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px">
+          <div style="display: flex; align-items: center; gap: 9px">
+            <span style="width: 22px; height: 22px; background: #6aa9d0; border: 2px solid #35313f; border-radius: 999px"></span>
+            <div style="display: flex; flex-direction: column"><span class="s-label">Wren</span><span class="s-hint">town herald</span></div>
+          </div>
+          <span class="model">claude-sonnet-5 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#35313f" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9 l7 7 7 -7"></path></svg></span>
+        </div>
+      </div>
+    </div>
+
+    <div style="display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 12px 20px 18px">
+      <span style="font-weight: 700; font-size: 14px; color: #8d8496; cursor: pointer">reset</span>
+      <span style="display: inline-flex; align-items: center; gap: 8px; background: #a8e6cf; border: 2.5px solid #35313f; border-radius: 999px; padding: 8px 26px; font-weight: 800; font-size: 16px; box-shadow: 0 4px 0 rgba(53,49,63,.2); cursor: pointer">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#35313f" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5 L10 18 L20 6"></path></svg>
+        done
+      </span>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

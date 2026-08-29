@@ -1,0 +1,100 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&amp;display=swap">
+  <style>
+    body { margin: 0; font-family: "Baloo 2", "Trebuchet MS", system-ui, sans-serif; color: #35313f; }
+    a { color: #e2574f; } a:hover { color: #c9536b; }
+    .q-card { border: 2px solid #e4d8c8; border-radius: 14px; padding: 11px 13px; background: #fffdf6;
+              display: flex; flex-direction: column; gap: 6px; }
+    .q-pill { font-size: 11px; font-weight: 700; color: #fffdf6; border-radius: 999px; padding: 1px 9px; letter-spacing: .04em; }
+    .q-step { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13px; }
+    .q-reward { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; font-size: 13px; color: #a4666e; }
+  </style>
+</helmet>
+<div style="width: 480px; height: 800px; overflow: hidden; background: #dff0f9; display: flex; align-items: center; justify-content: center">
+  <div style="width: 400px; background: #fffbf0; border: 2.5px solid #35313f; border-radius: 18px; overflow: hidden; box-shadow: 0 8px 0 rgba(53,49,63,.16); display: flex; flex-direction: column">
+
+    <div style="display: flex; align-items: center; gap: 9px; background: #ffe1b8; border-bottom: 2px solid #35313f; padding: 10px 14px">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#35313f" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3 h11 a2 2 0 0 1 2 2 v14 a2 2 0 0 1 -2 2 H7"></path><path d="M7 3 a2 2 0 0 0 -2 2 v14 a2 2 0 0 0 2 2"></path><path d="M9 8 h7"></path><path d="M9 12 h7"></path><path d="M9 16 h4"></path></svg>
+      <span style="font-weight: 800; font-size: 16px">quest board</span>
+      <span style="font-size: 11.5px; font-weight: 700; background: #fffdf6; border: 2px solid #35313f; border-radius: 999px; padding: 0 8px">2 open</span>
+      <span style="margin-left: auto; width: 28px; height: 28px; display: grid; place-items: center; background: #fffdf6; border: 2px solid #35313f; border-radius: 999px; cursor: pointer">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#35313f" stroke-width="3" stroke-linecap="round"><path d="M5 5 L19 19"></path><path d="M19 5 L5 19"></path></svg>
+      </span>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 10px; padding: 12px">
+
+      <!-- new quest -->
+      <div class="q-card">
+        <div style="display: flex; align-items: center; gap: 6px">
+          <span style="font-weight: 800; font-size: 15px">The Rumor Mill</span>
+          <span class="q-pill" style="background: #ffaaa5">new</span>
+        </div>
+        <div style="font-weight: 600; font-size: 13.5px; color: #6d6577">Wren wants three fresh rumors from beyond the walls — real ones, mind you.</div>
+        <div style="display: flex; flex-direction: column; gap: 3px">
+          <div class="q-step"><span style="width: 15px; height: 15px; border: 2px solid #cabfb2; border-radius: 999px; flex-shrink: 0"></span><span>ask Wren what the ravens heard</span></div>
+          <div class="q-step"><span style="width: 15px; height: 15px; border: 2px solid #cabfb2; border-radius: 999px; flex-shrink: 0"></span><span>bring one rumor to Bran</span></div>
+        </div>
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 3px">
+          <span class="q-reward">
+            <svg width="15" height="15" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="#ffe08a" stroke="#35313f" stroke-width="2.2"></circle><circle cx="12" cy="12" r="4.5" fill="none" stroke="#d9a43c" stroke-width="2"></circle></svg>
+            15 gold
+          </span>
+          <span style="border: 2px solid #35313f; background: #a8e6cf; border-radius: 999px; padding: 3px 16px; font-weight: 700; font-size: 13.5px; box-shadow: 0 3px 0 rgba(53,49,63,.2); cursor: pointer">accept</span>
+        </div>
+      </div>
+
+      <!-- active quest -->
+      <div class="q-card" style="border-color: #a8e6cf">
+        <div style="display: flex; align-items: center; gap: 6px">
+          <span style="font-weight: 800; font-size: 15px">Iron for Bran</span>
+          <span class="q-pill" style="background: #63bf95">active</span>
+        </div>
+        <div style="font-weight: 600; font-size: 13.5px; color: #6d6577">The forge is hungry. Find out what iron trades for out in the wide world.</div>
+        <div style="display: flex; flex-direction: column; gap: 3px">
+          <div class="q-step" style="color: #8d8496">
+            <svg width="15" height="15" viewBox="0 0 24 24" style="flex-shrink: 0"><circle cx="12" cy="12" r="10" fill="#a8e6cf" stroke="#35313f" stroke-width="2.2"></circle><path d="M7.5 12.5 L10.5 15.5 L16.5 8.5" stroke="#35313f" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none"></path></svg>
+            <span style="text-decoration: line-through">greet Bran at the forge</span>
+          </div>
+          <div class="q-step">
+            <svg width="15" height="15" viewBox="0 0 24 24" style="flex-shrink: 0"><circle cx="12" cy="12" r="10" fill="#fffdf6" stroke="#35313f" stroke-width="2.2"></circle><path d="M9 7.5 L15 12 L9 16.5" stroke="#e2574f" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none"></path></svg>
+            <span>ask him today&#39;s price of iron</span>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 3px">
+          <span class="q-reward">
+            <svg width="15" height="15" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="#ffe08a" stroke="#35313f" stroke-width="2.2"></circle><circle cx="12" cy="12" r="4.5" fill="none" stroke="#d9a43c" stroke-width="2"></circle></svg>
+            25 gold
+          </span>
+          <span style="font-weight: 700; font-size: 12.5px; color: #63bf95">1 of 2 done</span>
+        </div>
+      </div>
+
+      <!-- done quest -->
+      <div class="q-card" style="opacity: .62; position: relative">
+        <div style="display: flex; align-items: center; gap: 6px">
+          <span style="font-weight: 800; font-size: 15px">Step off the Boat</span>
+          <span class="q-pill" style="background: #b9bfc7">done</span>
+        </div>
+        <div style="font-weight: 600; font-size: 13.5px; color: #6d6577; padding-right: 96px">Arrive in Ashford and say hello to somebody. Anybody.</div>
+        <div style="position: absolute; right: 14px; bottom: 10px; transform: rotate(-8deg); border: 2.5px solid #63bf95; color: #63bf95; border-radius: 10px; padding: 1px 10px; font-weight: 800; font-size: 13px; letter-spacing: .06em; text-transform: uppercase">done ✔</div>
+      </div>
+    </div>
+
+    <div style="display: flex; align-items: center; justify-content: center; gap: 6px; padding: 4px 12px 12px; font-weight: 600; font-size: 12px; color: #8d8496">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#8d8496" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 c-2 3.5 -2 7 0 9 c2 -2 2 -5.5 0 -9 Z"></path><path d="M12 12 v8"></path><path d="M8 16 c1.5 1 2.8 1.3 4 1 c1.2 .3 2.5 0 4 -1"></path></svg>
+      <span>villagers post new work as the real world turns</span>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { AnimName } from '../../shared/protocol';
 import { SEA_Y, type IslandView } from './world';
 import { CharacterView } from './chars';
+import { angleToward } from './util';
 
 /**
  * Third-person controller: the hero walks the island, a spring-arm camera
@@ -237,12 +238,7 @@ export class Player {
       const nz = this.pos.z + dir.z * speed * dt;
       if (can(this.pos.x, nz)) this.pos.z = nz;
 
-      const target = Math.atan2(dir.x, dir.z);
-      // Shortest-path angle lerp so the hero turns, not spins.
-      let d = target - this.rot;
-      while (d > Math.PI) d -= Math.PI * 2;
-      while (d < -Math.PI) d += Math.PI * 2;
-      this.rot += d * Math.min(1, dt * 14);
+      this.rot = angleToward(this.rot, Math.atan2(dir.x, dir.z), dt * 14);
       // The wire only speaks idle/walk/run; a swimmer reads as walking.
       this.anim = this.swimming ? 'walk' : running ? 'run' : 'walk';
     } else {

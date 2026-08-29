@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { shadedBox as shadedVoxel } from './voxel';
 import type { Island, ObjectKind, Prop } from '../../shared/protocol';
 
 /**
@@ -32,20 +33,10 @@ export const C = {
  *  fifth of a block proud of the sea. Everything that floats reads from here. */
 export const SEA_Y = 0.84;
 
-/** Box with per-face vertex shading baked in: bright top, dimmer sides,
- *  darkest bottom. Multiplied with material/instance colour, it gives the
- *  clean "voxel" read without any lighting tricks. */
+// Terrain wants the hardest contrast of the three shade sets in the game.
+const SHADES = { top: 1.0, bottom: 0.55, sideX: 0.78, sideZ: 0.9 };
 function shadedBox(w = 1, h = 1, d = 1): THREE.BoxGeometry {
-  const g = new THREE.BoxGeometry(w, h, d);
-  const n = g.getAttribute('normal');
-  const colors = new Float32Array(n.count * 3);
-  for (let i = 0; i < n.count; i++) {
-    const ny = n.getY(i), nx = n.getX(i);
-    const v = ny > 0.5 ? 1.0 : ny < -0.5 ? 0.55 : Math.abs(nx) > 0.5 ? 0.78 : 0.9;
-    colors[i * 3] = colors[i * 3 + 1] = colors[i * 3 + 2] = v;
-  }
-  g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-  return g;
+  return shadedVoxel(w, h, d, SHADES);
 }
 
 const UNIT = shadedBox();

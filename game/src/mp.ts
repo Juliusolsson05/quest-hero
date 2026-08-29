@@ -8,6 +8,7 @@ import {
 } from 'playroomkit';
 import { CharacterView } from './chars';
 import type { AnimName } from '../../shared/protocol';
+import { angleToward } from './util';
 
 /**
  * Multiplayer, ported from worldplay4's net stack (src/lib/net/playroom.ts):
@@ -170,10 +171,7 @@ export class Multiplayer {
       r.rot = pose.rot;
       r.view.setAnim(pose.anim === 'idle' || pose.anim === 'walk' || pose.anim === 'run' ? pose.anim : 'idle');
       r.view.root.position.lerp(r.target, k);
-      let d = r.rot - r.view.root.rotation.y;
-      while (d > Math.PI) d -= Math.PI * 2;
-      while (d < -Math.PI) d += Math.PI * 2;
-      r.view.root.rotation.y += d * k;
+      r.view.root.rotation.y = angleToward(r.view.root.rotation.y, r.rot, k);
       r.view.update(dt);
     }
   }

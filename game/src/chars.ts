@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import type { AnimName, NpcLook } from '../../shared/protocol';
+import { shadedBox as shadedVoxel } from './voxel';
 
 /**
  * Character views. Every character works two ways:
@@ -26,17 +27,10 @@ export async function loadManifest(): Promise<void> {
   } catch { manifest = null; }
 }
 
+// Characters shade a touch softer than terrain so faces stay readable.
+const SHADES = { top: 1.0, bottom: 0.6, sideX: 0.8, sideZ: 0.92 };
 function shadedBox(w: number, h: number, d: number): THREE.BoxGeometry {
-  const g = new THREE.BoxGeometry(w, h, d);
-  const n = g.getAttribute('normal');
-  const colors = new Float32Array(n.count * 3);
-  for (let i = 0; i < n.count; i++) {
-    const ny = n.getY(i), nx = n.getX(i);
-    const v = ny > 0.5 ? 1.0 : ny < -0.5 ? 0.6 : Math.abs(nx) > 0.5 ? 0.8 : 0.92;
-    colors[i * 3] = colors[i * 3 + 1] = colors[i * 3 + 2] = v;
-  }
-  g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-  return g;
+  return shadedVoxel(w, h, d, SHADES);
 }
 
 // ── SF wardrobe ────────────────────────────────────────────────────────────

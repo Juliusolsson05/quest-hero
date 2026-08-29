@@ -1,5 +1,6 @@
 import type { WeatherKind } from '../../shared/protocol';
 import { CARTS, type CartKind } from './taxi';
+import { esc } from './util';
 
 /**
  * The scrying glass — press P, or tap the bottom-right button. Cartly
@@ -244,8 +245,3 @@ export class CartlyPhone {
   }
 }
 
-function esc(s: string): string {
-  const d = document.createElement('div');
-  d.textContent = s;
-  return d.innerHTML;
-}

@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { C } from './world';
+import { angleToward } from './util';
+import { shadedBox as shadedVoxel } from './voxel';
 
 /**
  * The IRS audit chamber: a separate room far off the island grid — past the
@@ -18,18 +20,10 @@ export const IRS_ARENA = {
   bounds: { minX: 160 - HALF + 0.7, maxX: 160 + HALF - 0.7, minZ: -60 - HALF + 0.7, maxZ: -60 + HALF - 0.7, y: 1 },
 };
 
-/** Per-face shaded box, same trick the island and characters use. */
+// The chamber shades flatter than the city — fluorescent gloom, no sun.
+const SHADES = { top: 1, bottom: 0.62, sideX: 0.82, sideZ: 0.82 };
 function shadedBox(w = 1, h = 1, d = 1): THREE.BoxGeometry {
-  const g = new THREE.BoxGeometry(w, h, d);
-  const n = g.getAttribute('normal');
-  const colors = new Float32Array(n.count * 3);
-  for (let i = 0; i < n.count; i++) {
-    const ny = n.getY(i);
-    const v = ny > 0.5 ? 1 : ny < -0.5 ? 0.62 : 0.82;
-    colors[i * 3] = v; colors[i * 3 + 1] = v; colors[i * 3 + 2] = v;
-  }
-  g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-  return g;
+  return shadedVoxel(w, h, d, SHADES);
 }
 
 function textPlane(text: string, fg: string, bg: string, w: number, h: number): THREE.Mesh {
@@ -151,11 +145,7 @@ class Taxcollector {
     const p = this.root.position;
 
     const faceToward = (tx: number, tz: number, rate: number) => {
-      const want = Math.atan2(tx - p.x, tz - p.z);
-      let d = want - this.rot;
-      while (d > Math.PI) d -= Math.PI * 2;
-      while (d < -Math.PI) d += Math.PI * 2;
-      this.rot += d * Math.min(1, dt * rate);
+      this.rot = angleToward(this.rot, Math.atan2(tx - p.x, tz - p.z), dt * rate);
     };
 
     if (this.state === 'pace') {

@@ -18,45 +18,51 @@ import type { NpcDef } from './npc';
 // fetch from the browser fails opaquely.
 const BASE = import.meta.env.VITE_TRUEFORGE_URL ?? '';
 
+/** Raised for every reason an NPC cannot answer, carrying the specific cause
+ *  so the dialogue box can show it rather than a generic failure. */
+export class HarnessUnavailable extends Error {}
+
 const sessions = new Map<string, string>();
 
 /** Cached so we resolve the model once per page load, not once per NPC. */
-let modelPromise: Promise<string> | null = null;
+let modelPromise: Promise<string[]> | null = null;
 
-/**
- * AgentSpec requires a model, and hardcoding a catalog id ("openai/gpt-5.2")
- * guesses at something the harness already knows. Ask it what is configured
- * and take the first — the game then works with whichever provider the user
- * set up, and says something useful when they have set up none.
- */
-async function resolveModel(): Promise<string> {
+/** Lists the model FQNs the harness actually has configured. Characters name
+ *  a preferred model, but the machine decides what exists, so selection is a
+ *  negotiation between the two rather than a hardcoded id. */
+async function configuredModels(): Promise<string[]> {
   const res = await fetch(`${BASE}/api/v1/models`);
   if (!res.ok) throw new HarnessUnavailable(`models: ${res.status}`);
   const models: { name?: string }[] = (await res.json())?.data ?? [];
-  const name = models[0]?.name;
-  if (!name) {
-    throw new HarnessUnavailable(
-      'no model configured in TrueForge — add a provider at http://localhost:8790 (Settings -> Models)',
-    );
-  }
-  return name;
+  return models.map((m) => m.name).filter((n): n is string => !!n);
 }
-
-export class HarnessUnavailable extends Error {}
 
 async function sessionFor(npc: NpcDef): Promise<string> {
   const existing = sessions.get(npc.id);
   if (existing) return existing;
 
-  modelPromise ??= resolveModel();
-  const model = await modelPromise;
+  modelPromise ??= configuredModels();
+  const available = await modelPromise;
+  const model = available.includes(npc.model) ? npc.model : available[0];
+  if (!model) {
+    throw new HarnessUnavailable(
+      'no model configured in TrueForge — add a provider at http://localhost:8790 (Settings -> Models)',
+    );
+  }
 
   const res = await fetch(`${BASE}/api/v1/sessions`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
-      agent: { spec: { model: { name: model }, instructions: npc.persona } },
-      metadata: { npc: npc.id, name: npc.name },
+      agent: {
+        spec: {
+          model: { name: model },
+          instructions: npc.persona,
+          ...(npc.mcpServers?.length
+            ? { mcp_servers: npc.mcpServers.map((name) => ({ name })) }
+            : {}),
+        },
+      },
     }),
   });
   if (!res.ok) throw new HarnessUnavailable(`create session: ${res.status} ${await res.text()}`);

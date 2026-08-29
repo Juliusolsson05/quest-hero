@@ -11,7 +11,7 @@
 import type { TimePhase, TimeState, WeatherKind } from '../../shared/protocol';
 import { CONFIG } from './config';
 import { poi, randomWalkableNear } from '../../shared/island';
-import { scribeQuest } from './dialogue';
+import { scribeQuest } from './scribe';
 import {
   addEvent,
   getWeather,

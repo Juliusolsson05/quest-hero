@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import type { AnimName } from '../../shared/protocol';
+import type { AnimName, NpcLook } from '../../shared/protocol';
 
 /**
  * Character views. Every character works two ways:
@@ -8,6 +8,10 @@ import type { AnimName } from '../../shared/protocol';
  *    is complete with zero downloaded assets;
  *  - a Tripo GLB (idle/walk/run clips lifted from the sibling animation files)
  *    that transparently replaces the placeholder when the manifest lists it.
+ *
+ * The SF looks ('techbro-phone', 'techbro-laptop', 'investor') are pure
+ * placeholder builds with hand props — glowing phone, open laptop, coffee —
+ * and their own idle animations (doomscroll, typing, the periodic sip).
  */
 
 interface Manifest { characters: Record<string, Record<string, string>> }
@@ -35,6 +39,50 @@ function shadedBox(w: number, h: number, d: number): THREE.BoxGeometry {
   return g;
 }
 
+// ── SF wardrobe ────────────────────────────────────────────────────────────
+/** Per-character wardrobe for the tech looks; unknown ids fall back per look. */
+interface TechStyle {
+  top: number;              // hoodie or vest
+  shirt?: number;           // sleeves/collar under a vest
+  pants: number;
+  shoes: number;
+  hair: number;
+  skin: number;
+  headgear: 'fringe' | 'capBack' | 'hood' | 'bun' | 'slick' | 'silver';
+  capColor?: number;
+  sunglasses?: boolean;
+  lanyard?: boolean;
+}
+
+const TECH_STYLES: Record<string, TechStyle> = {
+  // founder: heather-gray hoodie, black jeans, box-fresh sneakers
+  blake:  { top: 0xb9c2cc, pants: 0x3f4048, shoes: 0xf5f5f2, hair: 0x8a6742,
+            skin: 0xffe8cf, headgear: 'fringe' },
+  // growth hacker: mint hoodie, backwards cap
+  kayden: { top: 0x9fe0c6, pants: 0x8b8f99, shoes: 0xf5f5f2, hair: 0x3d2f22,
+            skin: 0xc98d5f, headgear: 'capBack', capColor: 0x4a4a55 },
+  // 10x engineer: charcoal hoodie, hood up, badge lanyard
+  tanner: { top: 0x565d6b, pants: 0x3f4048, shoes: 0xf5f5f2, hair: 0x2f2b33,
+            skin: 0xffe8cf, headgear: 'hood', lanyard: true },
+  // AI researcher: sage vest over lavender long-sleeve, messy bun
+  sloane: { top: 0xaec5a0, shirt: 0xcdb8f0, pants: 0x6b6f7a, shoes: 0xf5f5f2,
+            hair: 0x4a3628, skin: 0xf2d3b0, headgear: 'bun' },
+  // VC: navy quilted vest over light-blue button-down, khakis, wool sneakers
+  chad:   { top: 0x39496b, shirt: 0xbcd8f2, pants: 0xcdb891, shoes: 0xb7b3ad,
+            hair: 0x6e5335, skin: 0xf7dbb5, headgear: 'slick' },
+  // angel: gray fleece vest, silver hair, sunglasses that never come off
+  marcus: { top: 0xb0b4bd, shirt: 0xfdfaf2, pants: 0x46474f, shoes: 0x8a6742,
+            hair: 0xd8dde2, skin: 0xe0b68f, headgear: 'silver', sunglasses: true },
+};
+
+const LOOK_DEFAULTS: Record<Exclude<NpcLook, 'villager'>, TechStyle> = {
+  'techbro-phone': TECH_STYLES.blake,
+  'techbro-laptop': TECH_STYLES.tanner,
+  'investor': TECH_STYLES.chad,
+};
+
+const darken = (c: number, k = 0.8) => new THREE.Color(c).multiplyScalar(k).getHex();
+
 export class CharacterView {
   readonly root = new THREE.Group();
   private body: THREE.Group | null = null;   // placeholder pieces
@@ -43,14 +91,20 @@ export class CharacterView {
   private actions: Partial<Record<AnimName, THREE.AnimationAction>> = {};
   private current: AnimName = 'idle';
   private t = Math.random() * 10;
+  /** anim handles for the SF looks */
+  private extras: { phone?: THREE.Group; phoneY?: number;
+                    hands?: THREE.Mesh[]; handY?: number;
+                    sipArm?: THREE.Group } = {};
 
-  constructor(readonly id: string, tint: number, readonly height = 1.5) {
-    this.buildPlaceholder(tint);
+  constructor(readonly id: string, tint: number, readonly height = 1.5,
+              readonly look: NpcLook = 'villager') {
+    if (look === 'villager') this.buildVillager(tint);
+    else this.buildTech(look);
     void this.tryUpgrade();
   }
 
-  private buildPlaceholder(tint: number): void {
-    const g = new THREE.Group();
+  // shared little factories for placeholder pieces
+  private mkInto(g: THREE.Group) {
     const mat = (c: number) => new THREE.MeshStandardMaterial({ color: c, vertexColors: true, roughness: 0.85 });
     const mk = (w: number, h: number, d: number, c: number, x: number, y: number, z: number) => {
       const m = new THREE.Mesh(shadedBox(w, h, d), mat(c));
@@ -59,32 +113,178 @@ export class CharacterView {
       g.add(m);
       return m;
     };
+    /** unlit box — reads as glowing (screens, lenses) */
+    const lit = (w: number, h: number, d: number, c: number, x: number, y: number, z: number) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshBasicMaterial({ color: c }));
+      m.position.set(x, y, z);
+      g.add(m);
+      return m;
+    };
+    return { mk, lit };
+  }
+
+  private buildVillager(tint: number): void {
+    const g = new THREE.Group();
+    const { mk } = this.mkInto(g);
     mk(0.2, 0.3, 0.24, 0x5a5566, -0.15, 0.15, 0);   // legs
     mk(0.2, 0.3, 0.24, 0x5a5566, 0.15, 0.15, 0);
     mk(0.62, 0.55, 0.4, tint, 0, 0.58, 0);           // body
     mk(0.5, 0.16, 0.34, tint, 0, 0.3, 0);            // lil skirt/hem
+    const head = this.buildHead(g, 0xffe8cf);
+    const { mk: mkH } = this.mkInto(head as THREE.Group);
+    const hair = mkH(0.7, 0.24, 0.66, darken(tint, 0.55), 0, 0.24, 0);
+    hair.castShadow = true;
+    this.body = g;
+    this.root.add(g);
+  }
+
+  /** Skull + eyes + blush at the standard height; returns the head group. */
+  private buildHead(g: THREE.Group, skin: number): THREE.Group {
     const head = new THREE.Group();
-    const skull = new THREE.Mesh(shadedBox(0.66, 0.6, 0.62), mat(0xffe8cf));
-    skull.castShadow = true;
-    head.add(skull);
-    const hair = new THREE.Mesh(shadedBox(0.7, 0.24, 0.66), mat(new THREE.Color(tint).multiplyScalar(0.55).getHex()));
-    hair.position.y = 0.24;
-    head.add(hair);
-    const eye = (x: number) => {
-      const e = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.11, 0.03), new THREE.MeshBasicMaterial({ color: 0x2c2833 }));
-      e.position.set(x, 0.02, 0.32);
-      head.add(e);
-    };
-    eye(-0.14); eye(0.14);
-    const blush = (x: number) => {
-      const b = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.05, 0.03), new THREE.MeshBasicMaterial({ color: 0xffb3ab }));
-      b.position.set(x, -0.12, 0.32);
-      head.add(b);
-    };
-    blush(-0.22); blush(0.22);
+    const { mk, lit } = this.mkInto(head);
+    mk(0.66, 0.6, 0.62, skin, 0, 0, 0);                          // skull
+    lit(0.07, 0.11, 0.03, 0x2c2833, -0.14, 0.02, 0.32);          // eyes
+    lit(0.07, 0.11, 0.03, 0x2c2833, 0.14, 0.02, 0.32);
+    lit(0.09, 0.05, 0.03, 0xffb3ab, -0.22, -0.12, 0.32);         // blush
+    lit(0.09, 0.05, 0.03, 0xffb3ab, 0.22, -0.12, 0.32);
     head.position.y = 1.18;
     g.add(head);
     this.head = head;
+    return head;
+  }
+
+  /** The SF builds: hoodie/vest bodies, hand props, look-specific headgear. */
+  private buildTech(look: Exclude<NpcLook, 'villager'>): void {
+    const s = TECH_STYLES[this.id] ?? LOOK_DEFAULTS[look];
+    const g = new THREE.Group();
+    const { mk } = this.mkInto(g);
+
+    // sneakers + pants
+    mk(0.22, 0.12, 0.3, s.shoes, -0.15, 0.06, 0.03);
+    mk(0.22, 0.12, 0.3, s.shoes, 0.15, 0.06, 0.03);
+    mk(0.2, 0.26, 0.24, s.pants, -0.15, 0.27, 0);
+    mk(0.2, 0.26, 0.24, s.pants, 0.15, 0.27, 0);
+
+    const vest = look === 'investor' || s.shirt !== undefined;
+    const sleeve = vest ? s.shirt! : s.top;
+    if (vest) {
+      mk(0.6, 0.55, 0.38, s.shirt!, 0, 0.58, 0);                 // shirt torso
+      mk(0.68, 0.48, 0.46, s.top, 0, 0.56, 0);                   // puffer vest
+      for (const y of [0.44, 0.56, 0.68])                        // quilt seams
+        mk(0.7, 0.035, 0.48, darken(s.top), 0, y, 0);
+      mk(0.05, 0.42, 0.04, 0xd8d4ca, 0, 0.56, 0.24);             // zipper
+      mk(0.3, 0.08, 0.1, s.shirt!, 0, 0.87, 0.16);               // collar
+    } else {
+      mk(0.62, 0.55, 0.4, s.top, 0, 0.58, 0);                    // hoodie torso
+      mk(0.36, 0.16, 0.05, darken(s.top), 0, 0.42, 0.21);        // kangaroo pocket
+      mk(0.03, 0.14, 0.03, 0xfdfaf2, -0.09, 0.76, 0.215);        // drawstrings
+      mk(0.03, 0.14, 0.03, 0xfdfaf2, 0.09, 0.76, 0.215);
+      if (s.headgear !== 'hood')                                 // hood, down
+        mk(0.46, 0.16, 0.14, darken(s.top), 0, 0.84, -0.24);
+    }
+    if (s.lanyard) {
+      mk(0.08, 0.3, 0.03, 0xe25b3d, 0, 0.74, 0.215);
+      mk(0.18, 0.22, 0.03, 0xfdfaf2, 0, 0.54, 0.22);             // badge
+    }
+
+    // head + headgear
+    const head = this.buildHead(g, s.skin);
+    const { mk: mkH } = this.mkInto(head);
+    switch (s.headgear) {
+      case 'fringe':
+        mkH(0.7, 0.22, 0.66, s.hair, 0, 0.25, 0);
+        mkH(0.3, 0.1, 0.08, s.hair, 0.12, 0.16, 0.3);            // swoop
+        break;
+      case 'capBack':
+        mkH(0.68, 0.12, 0.64, s.hair, 0, 0.19, 0);
+        mkH(0.7, 0.18, 0.66, s.capColor!, 0, 0.31, 0.02);
+        mkH(0.46, 0.06, 0.3, s.capColor!, 0, 0.26, -0.45);       // bill, backwards
+        break;
+      case 'hood':
+        mkH(0.74, 0.66, 0.32, s.top, 0, 0.03, -0.22);            // hood shell
+        mkH(0.74, 0.2, 0.6, s.top, 0, 0.33, -0.06);
+        mkH(0.16, 0.16, 0.16, s.top, 0, 0.08, -0.44);            // hood tip
+        break;
+      case 'bun':
+        mkH(0.7, 0.2, 0.66, s.hair, 0, 0.24, 0);
+        mkH(0.24, 0.22, 0.24, s.hair, 0, 0.42, -0.18);           // the bun
+        mkH(0.08, 0.24, 0.06, s.hair, -0.3, 0.06, 0.3);          // loose strands
+        mkH(0.08, 0.24, 0.06, s.hair, 0.3, 0.06, 0.3);
+        break;
+      case 'slick':
+        mkH(0.68, 0.12, 0.64, s.hair, 0, 0.28, 0);
+        break;
+      case 'silver':
+        mkH(0.68, 0.14, 0.64, s.hair, 0, 0.28, 0);
+        mkH(0.6, 0.18, 0.12, s.hair, 0, 0.12, -0.34);            // longer back
+        break;
+    }
+    if (s.sunglasses) {
+      const { lit: litH } = this.mkInto(head);
+      litH(0.18, 0.15, 0.04, 0x26242e, -0.14, 0.03, 0.335);      // aviators
+      litH(0.18, 0.15, 0.04, 0x26242e, 0.14, 0.03, 0.335);
+      litH(0.1, 0.05, 0.04, 0x26242e, 0, 0.07, 0.335);
+    }
+    if (look !== 'investor') {                                   // AirPods
+      const { mk: mkH2 } = this.mkInto(head);
+      mkH2(0.05, 0.11, 0.05, 0xfafafa, -0.36, -0.02, 0.08);
+      mkH2(0.05, 0.11, 0.05, 0xfafafa, 0.36, -0.02, 0.08);
+    }
+
+    // arms + the prop that defines the look
+    if (look === 'techbro-phone') {
+      mk(0.16, 0.4, 0.2, sleeve, -0.39, 0.62, 0);                // left arm down
+      mk(0.16, 0.28, 0.2, sleeve, 0.39, 0.74, 0.02);             // right upper arm
+      const fa = mk(0.13, 0.13, 0.34, sleeve, 0.33, 0.86, 0.25); // forearm up-forward
+      fa.rotation.x = -0.9;
+      const phone = new THREE.Group();
+      const { mk: mkP, lit: litP } = this.mkInto(phone);
+      mkP(0.2, 0.36, 0.05, 0x2b2b33, 0, 0, 0);
+      litP(0.17, 0.3, 0.02, 0xd9f2ff, 0, 0, -0.03);              // screen faces him
+      mkP(0.06, 0.06, 0.03, s.skin, 0.1, -0.16, -0.03);          // scrolling thumb
+      phone.position.set(0.3, 1.02, 0.44);
+      phone.rotation.x = -0.55;
+      g.add(phone);
+      this.extras.phone = phone;
+      this.extras.phoneY = phone.position.y;
+    } else if (look === 'techbro-laptop') {
+      mk(0.16, 0.24, 0.2, sleeve, -0.39, 0.72, 0.04);            // upper arms
+      mk(0.16, 0.24, 0.2, sleeve, 0.39, 0.72, 0.04);
+      mk(0.13, 0.13, 0.28, sleeve, -0.36, 0.6, 0.2);             // forearms forward
+      mk(0.13, 0.13, 0.28, sleeve, 0.36, 0.6, 0.2);
+      const h1 = mk(0.11, 0.09, 0.12, s.skin, -0.3, 0.6, 0.36);  // typing hands
+      const h2 = mk(0.11, 0.09, 0.12, s.skin, 0.3, 0.6, 0.36);
+      const laptop = new THREE.Group();
+      const { mk: mkL, lit: litL } = this.mkInto(laptop);
+      mkL(0.54, 0.04, 0.36, 0x3a3d45, 0, 0, 0);                  // base
+      mkL(0.48, 0.02, 0.3, 0x596070, 0, 0.03, -0.01);            // keyboard
+      const screen = mkL(0.54, 0.4, 0.03, 0x3a3d45, 0, 0.2, 0.19);
+      screen.rotation.x = 0.42;                                  // hinged back
+      const display = litL(0.46, 0.32, 0.01, 0xcfe8ff, 0, 0, 0);
+      display.position.set(0, 0.02, -0.022);
+      screen.add(display);
+      const logo = litL(0.09, 0.09, 0.01, 0xe8e4da, 0, 0, 0);    // fruit logo
+      logo.position.set(0, 0.04, 0.022);
+      screen.add(logo);
+      laptop.position.set(0, 0.6, 0.42);
+      g.add(laptop);
+      this.extras.hands = [h1, h2];
+      this.extras.handY = 0.6;
+    } else {
+      mk(0.16, 0.4, 0.2, sleeve, -0.39, 0.62, 0);                // left arm down
+      mk(0.17, 0.05, 0.21, 0xf2c14e, -0.39, 0.44, 0);            // gold watch
+      mk(0.16, 0.26, 0.2, sleeve, 0.39, 0.74, 0.02);             // right upper arm
+      const sipArm = new THREE.Group();                          // pivots at elbow
+      const { mk: mkA } = this.mkInto(sipArm);
+      mkA(0.13, 0.13, 0.3, sleeve, 0, 0, 0.14);                  // forearm
+      mkA(0.16, 0.08, 0.16, 0xcdaf8f, 0, 0.02, 0.32);            // cup sleeve
+      mkA(0.15, 0.2, 0.15, 0xfdfaf2, 0, 0.08, 0.32);             // the coffee
+      mkA(0.16, 0.045, 0.16, 0x8a5a3b, 0, 0.2, 0.32);            // lid
+      sipArm.position.set(0.39, 0.64, 0.06);
+      g.add(sipArm);
+      this.extras.sipArm = sipArm;
+    }
+
     this.body = g;
     this.root.add(g);
   }
@@ -153,7 +353,31 @@ export class CharacterView {
     const amp = this.current === 'run' ? 0.07 : this.current === 'walk' ? 0.045 : 0.02;
     b.position.y = Math.abs(Math.sin(this.t * speed)) * amp;
     b.rotation.z = Math.sin(this.t * speed) * (this.current === 'idle' ? 0.01 : 0.06);
-    if (this.head) this.head.rotation.x = Math.sin(this.t * 1.7) * 0.05;
+
+    // Look-specific idles layered on top of the bob.
+    const ex = this.extras;
+    if (this.look === 'techbro-phone' && this.head) {
+      // doomscrolling: head down at the slab, phone gently tapping
+      this.head.rotation.x = 0.38 + Math.sin(this.t * 1.9) * 0.04;
+      if (ex.phone) ex.phone.position.y = ex.phoneY! + Math.sin(this.t * 9) * 0.008;
+    } else if (this.look === 'techbro-laptop' && this.head) {
+      // typing: eyes on the screen, hands alternating on the keys
+      this.head.rotation.x = 0.24 + Math.sin(this.t * 1.6) * 0.03;
+      if (ex.hands) {
+        const tap = this.current === 'idle' ? 0.022 : 0.01;
+        ex.hands[0].position.y = ex.handY! + Math.max(0, Math.sin(this.t * 13)) * tap;
+        ex.hands[1].position.y = ex.handY! + Math.max(0, Math.sin(this.t * 13 + Math.PI)) * tap;
+      }
+    } else if (this.look === 'investor' && ex.sipArm) {
+      // every ~7s the coffee comes up for a long, satisfied sip
+      const c = this.t % 7;
+      const target = c > 5.2 && c < 6.4 ? -1.15 : 0;
+      ex.sipArm.rotation.x += (target - ex.sipArm.rotation.x) * Math.min(1, dt * 7);
+      if (this.head)
+        this.head.rotation.x = Math.sin(this.t * 1.7) * 0.05 + ex.sipArm.rotation.x * -0.12;
+    } else if (this.head) {
+      this.head.rotation.x = Math.sin(this.t * 1.7) * 0.05;
+    }
   }
 }
 

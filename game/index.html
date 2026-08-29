@@ -72,6 +72,100 @@
       .q-accept:active { transform: translateY(2px); box-shadow: none; }
       .q-empty { color: #8d8496; font-weight: 600; padding: 8px; }
 
+      /* the scrying glass (Cartly) — see src/cartly.ts */
+      #phonebtn { position: fixed; right: 20px; bottom: 20px; z-index: 29; width: 56px; height: 56px;
+                  border: 2.5px solid #35313f; border-radius: 999px; background: rgba(255,253,246,.95);
+                  cursor: pointer; display: grid; place-items: center;
+                  box-shadow: 0 4px 0 rgba(53,49,63,.18); color: #35313f; }
+      #phonebtn:active { transform: translateY(2px); box-shadow: none; }
+      #phonebtn .pb-key { position: absolute; top: -7px; left: -7px; background: #35313f; color: #fffdf6;
+                          border-radius: 6px; padding: 1px 6px; font: 700 11px "Baloo 2", sans-serif; }
+      #phone.on ~ #phonebtn { opacity: 0; pointer-events: none; }
+      #phone { position: fixed; right: 20px; bottom: -700px; width: 288px; z-index: 30;
+               transition: bottom .38s cubic-bezier(.33,1.4,.6,1); }
+      #phone.on { bottom: 18px; }
+      #phone button { font-family: inherit; color: inherit; }
+      .ph-bezel { background: #fffdf6; border: 3px solid #35313f; border-radius: 42px; padding: 11px;
+                  box-shadow: 0 10px 0 rgba(53,49,63,.22); }
+      .ph-screen { border: 2.5px solid #35313f; border-radius: 32px; background: #fffbf0; height: 592px;
+                   padding: 12px 13px 8px; display: flex; flex-direction: column; gap: 8px; overflow: hidden; }
+      .ph-status { display: flex; justify-content: space-between; font-weight: 700; font-size: 12px; }
+      .ph-sig { display: inline-flex; align-items: flex-end; gap: 3px; }
+      .ph-sig i { width: 4px; background: #35313f; border-radius: 2px; display: inline-block; }
+      .ph-sig i.dim { background: rgba(53,49,63,.3); }
+      .ph-page { display: flex; flex-direction: column; gap: 8px; flex: 1; min-height: 0; }
+      .ph-page[hidden] { display: none; }
+      .ph-head { display: flex; align-items: center; gap: 8px; }
+      .ph-logo { width: 34px; height: 34px; display: grid; place-items: center; background: #ffaaa5;
+                 border: 2.5px solid #35313f; border-radius: 11px; box-shadow: 0 3px 0 rgba(53,49,63,.16); }
+      .ph-brand { display: flex; flex-direction: column; line-height: 1.05; }
+      .ph-brand b { font-weight: 800; font-size: 18px; }
+      .ph-brand i { font-style: normal; font-weight: 600; font-size: 10px; color: #a4666e;
+                    letter-spacing: .06em; text-transform: uppercase; }
+      .ph-route { position: relative; display: flex; flex-direction: column; gap: 6px; border: 2px solid #e4d8c8;
+                  border-radius: 13px; background: #fffdf6; padding: 8px 11px; }
+      .ph-route > div { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+      .ph-route b { font-weight: 700; }
+      .ph-route > div i { font-style: normal; margin-left: auto; font-weight: 600; font-size: 10.5px; color: #8d8496; }
+      .ph-dotline { position: absolute; left: 16.5px; top: 26px; bottom: 26px; border-left: 2px dotted #b9bfc7; }
+      .ph-dot { width: 11px; height: 11px; background: #a8e6cf; border: 2.5px solid #35313f;
+                border-radius: 999px; flex-shrink: 0; }
+      .ph-pin { flex-shrink: 0; margin: 0 1px; }
+      .ph-label { font-weight: 800; font-size: 10.5px; letter-spacing: .09em; text-transform: uppercase; color: #a4666e; }
+      .ph-rides { display: flex; flex-direction: column; gap: 7px; }
+      .ph-ride { display: flex; align-items: center; gap: 9px; border: 2px solid #e4d8c8; border-radius: 13px;
+                 background: #fffdf6; padding: 7px 10px; font-size: inherit; text-align: left; cursor: pointer; }
+      .ph-ride.on { border-color: #63bf95; background: #f0fbf6; box-shadow: 0 3px 0 rgba(53,49,63,.12); }
+      .ph-ride svg { flex-shrink: 0; }
+      .ph-ride-t, .ph-ride-p { display: flex; flex-direction: column; line-height: 1.2; }
+      .ph-ride-t b, .ph-ride-p b { font-weight: 800; font-size: 13.5px; }
+      .ph-ride-t i, .ph-ride-p i { font-style: normal; font-weight: 600; font-size: 10.5px; color: #8d8496; }
+      .ph-ride-p { margin-left: auto; align-items: flex-end; }
+      .ph-scried { display: flex; align-items: center; justify-content: center; gap: 5px; font-weight: 600;
+                   font-size: 10.5px; color: #8d8496; text-align: center; }
+      .ph-summon { margin-top: auto; display: flex; align-items: center; justify-content: center; gap: 8px;
+                   background: #e2574f; color: #fffdf6 !important; border: 2.5px solid #35313f; border-radius: 999px;
+                   padding: 10px; font-weight: 800; font-size: 15px; box-shadow: 0 5px 0 rgba(53,49,63,.22); cursor: pointer; }
+      .ph-summon:active { transform: translateY(3px); box-shadow: 0 2px 0 rgba(53,49,63,.22); }
+      .ph-fare-chip { font-weight: 700; font-size: 11.5px; background: rgba(255,253,246,.25);
+                      border-radius: 999px; padding: 1px 8px; }
+      .ph-eta { display: flex; align-items: center; gap: 10px; background: #ffe1b8; border: 2.5px solid #35313f;
+                border-radius: 15px; padding: 9px 12px; box-shadow: 0 4px 0 rgba(53,49,63,.14); }
+      .ph-eta span:last-child { display: flex; flex-direction: column; }
+      .ph-eta b { font-weight: 800; font-size: 14px; line-height: 1.15; }
+      .ph-eta i { font-style: normal; font-weight: 600; font-size: 11px; color: #a4666e; }
+      .ph-eta-icon svg, .ph-map-cart svg { animation: trot .7s ease-in-out infinite; }
+      @keyframes trot { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
+      .ph-map { border: 2px solid #35313f; border-radius: 15px; background: #e8f6ee; overflow: hidden;
+                flex: 1; min-height: 120px; }
+      .ph-map-cart { transition: transform .5s linear; }
+      .ph-driver { display: flex; align-items: center; gap: 9px; border: 2px solid #e4d8c8; border-radius: 14px;
+                   background: #fffdf6; padding: 8px 10px; }
+      .ph-ava { flex-shrink: 0; display: grid; place-items: center; }
+      .ph-driver-t { display: flex; flex-direction: column; gap: 1px; min-width: 0; line-height: 1.2; }
+      .ph-driver-t b { font-weight: 800; font-size: 13.5px; }
+      .ph-driver-t i { font-style: normal; font-weight: 600; font-size: 10.5px; color: #8d8496; }
+      .ph-driver-t em { font-style: normal; display: inline-flex; align-items: center; gap: 4px;
+                        font-size: 11px; font-weight: 800; }
+      .ph-plate { margin-left: auto; align-self: flex-start; font-weight: 800; font-size: 10px; letter-spacing: .06em;
+                  border: 2px solid #35313f; border-radius: 7px; padding: 1px 7px;
+                  box-shadow: 0 2px 0 rgba(53,49,63,.16); background: #fffdf6; }
+      .ph-msg { display: flex; align-items: center; gap: 8px; }
+      .ph-msg > span { flex: 1; border: 2px solid #d9cfc4; background: #fff; border-radius: 999px;
+                       padding: 7px 12px; font-weight: 600; font-size: 11.5px; color: #8d8496; }
+      .ph-msg-go { width: 34px; height: 34px; display: grid; place-items: center; background: #a8e6cf;
+                   border: 2.5px solid #35313f; border-radius: 999px; box-shadow: 0 3px 0 rgba(53,49,63,.2);
+                   cursor: pointer; flex-shrink: 0; }
+      .ph-foot { display: flex; align-items: center; justify-content: space-between; margin-top: auto; }
+      .ph-foot-t { font-weight: 600; font-size: 10.5px; color: #8d8496; }
+      .ph-cancel { border: 2px solid #35313f; background: #ffd9d5; border-radius: 999px; padding: 3px 12px;
+                   font-weight: 700; font-size: 11.5px; box-shadow: 0 3px 0 rgba(53,49,63,.16); cursor: pointer; }
+      .ph-bar { width: 92px; height: 6px; background: #35313f; border-radius: 999px; opacity: .8;
+                margin: 4px auto 0; flex-shrink: 0; }
+      @media (prefers-reduced-motion: reduce) {
+        #phone, .ph-eta-icon svg, .ph-map-cart svg, .ph-map-cart { transition: none; animation: none; }
+      }
+
       /* start overlay */
       #start { position: fixed; inset: 0; display: grid; place-content: center; gap: 12px; text-align: center;
                background: linear-gradient(180deg, #bfe6f7 0%, #ffe9d2 78%, #ffd9d5 100%); cursor: pointer; z-index: 40; }
@@ -88,7 +182,7 @@
     <div id="start">
       <h1>🏘️ Quest Hero</h1>
       <div class="sub">Ashford — a tiny village that lives on real data</div>
-      <div class="keys">WASD move · Shift run · drag to look · wheel zoom · <kbd>E</kbd> talk / read</div>
+      <div class="keys">WASD move · Shift run · drag to look · wheel zoom · <kbd>E</kbd> talk / read · <kbd>P</kbd> phone</div>
       <div class="go">click to step off the boat ✨</div>
     </div>
     <script type="module" src="/src/main.ts"></script>

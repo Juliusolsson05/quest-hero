@@ -1,0 +1,136 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&amp;display=swap">
+  <style>
+    body { margin: 0; font-family: "Baloo 2", "Trebuchet MS", system-ui, sans-serif; color: #35313f; }
+    a { color: #e2574f; } a:hover { color: #c9536b; }
+    @keyframes trot { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
+  </style>
+</helmet>
+<div style="width: 400px; height: 820px; overflow: hidden; background: #f7efe2; background-image: radial-gradient(rgba(53,49,63,.07) 1.6px, transparent 1.6px); background-size: 26px 26px; display: flex; align-items: center; justify-content: center">
+  <div style="position: relative">
+    <!-- star sticker on the bezel -->
+    <svg width="46" height="46" viewBox="0 0 46 46" style="position: absolute; top: -12px; right: -14px; transform: rotate(14deg)" aria-hidden="true">
+      <path d="M23 4 l5.5 12.5 12.5 5.5 -12.5 5.5 -5.5 12.5 -5.5 -12.5 -12.5 -5.5 12.5 -5.5 Z" fill="#ffe08a" stroke="#35313f" stroke-width="2.5" stroke-linejoin="round"></path>
+    </svg>
+    <div style="position: absolute; right: -6px; top: 140px; width: 6px; height: 46px; background: #35313f; border-radius: 0 4px 4px 0"></div>
+    <div style="position: absolute; right: -6px; top: 196px; width: 6px; height: 46px; background: #35313f; border-radius: 0 4px 4px 0"></div>
+
+    <div style="width: 340px; height: 740px; background: #fffdf6; border: 3px solid #35313f; border-radius: 46px; padding: 13px; box-shadow: 0 10px 0 rgba(53,49,63,.22)">
+      <div style="height: 100%; border: 2.5px solid #35313f; border-radius: 34px; overflow: hidden; background: #fffbf0; display: flex; flex-direction: column; gap: 10px; padding: 14px 15px 12px">
+
+        <!-- in-world status row -->
+        <div style="display: flex; align-items: center; justify-content: space-between; font-weight: 700; font-size: 12.5px">
+          <span>17:44</span>
+          <span style="display: inline-flex; align-items: flex-end; gap: 4px">
+            <svg width="15" height="12" viewBox="0 0 24 20" fill="#35313f"><path d="M2 12 q6 -10 13 -8 l7 -2 -5 5 q3 8 -6 11 q-6 2 -9 -6 Z"></path></svg>
+            <span style="width: 4px; height: 5px; background: #35313f; border-radius: 2px"></span>
+            <span style="width: 4px; height: 8px; background: #35313f; border-radius: 2px"></span>
+            <span style="width: 4px; height: 11px; background: rgba(53,49,63,.3); border-radius: 2px"></span>
+          </span>
+        </div>
+
+        <!-- eta banner -->
+        <div style="display: flex; align-items: center; gap: 11px; background: #ffe1b8; border: 2.5px solid #35313f; border-radius: 16px; padding: 10px 13px; box-shadow: 0 4px 0 rgba(53,49,63,.14)">
+          <svg width="30" height="24" viewBox="0 0 34 26" style="animation: trot 0.7s ease-in-out infinite" aria-hidden="true">
+            <path d="M2 8 h12 l2.5 4 h3" stroke="#35313f" stroke-width="2" fill="none" stroke-linecap="round"></path>
+            <path d="M3 8 l1.8 4 h11.7" stroke="#35313f" stroke-width="2" fill="none"></path>
+            <circle cx="7" cy="18" r="3" fill="#fffdf6" stroke="#35313f" stroke-width="2"></circle>
+            <circle cx="15" cy="18" r="3" fill="#fffdf6" stroke="#35313f" stroke-width="2"></circle>
+            <path d="M22 12 q1 -6 6 -6 q4 0 4 5 v7" stroke="#35313f" stroke-width="2" fill="#d08b4a" stroke-linejoin="round"></path>
+            <path d="M27 6 l1.6 -3 2 2.6" stroke="#35313f" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"></path>
+          </svg>
+          <span style="display: flex; flex-direction: column">
+            <span style="font-weight: 800; font-size: 16px; line-height: 1.15">thy cart arriveth in 3 min</span>
+            <span style="font-weight: 600; font-size: 11.5px; color: #a4666e">Buttercup trots apace ✨</span>
+          </span>
+        </div>
+
+        <!-- map -->
+        <svg viewBox="0 0 274 300" width="100%" height="300" style="border: 2px solid #35313f; border-radius: 16px; background: #e8f6ee; flex-shrink: 0" aria-hidden="true">
+          <path d="M-10 240 Q 60 218 120 226 T 284 206" stroke="#d9ecdf" stroke-width="36" fill="none"></path>
+          <path d="M30 262 Q 60 218 104 190" stroke="#63bf95" stroke-width="3.5" stroke-linecap="round" fill="none"></path>
+          <path d="M104 190 Q 150 160 186 120 Q 216 90 234 64" stroke="#e2574f" stroke-width="3.5" stroke-dasharray="1 8" stroke-linecap="round" fill="none"></path>
+          <g stroke="#35313f" stroke-width="2.5" stroke-linejoin="round">
+            <rect x="36" y="74" width="38" height="27" rx="5" fill="#fff3dd"></rect>
+            <path d="M31 76 L55 58 L79 76 Q55 69 31 76 Z" fill="#f49b3d"></path>
+            <rect x="196" y="186" width="34" height="24" rx="5" fill="#fffdf6"></rect>
+            <path d="M192 188 L213 172 L234 188 Q213 182 192 188 Z" fill="#ff9d96"></path>
+            <circle cx="140" cy="256" r="12" fill="#63bf95"></circle>
+            <circle cx="252" cy="150" r="10" fill="#a8e6cf"></circle>
+            <circle cx="20" cy="150" r="9" fill="#a8e6cf"></circle>
+          </g>
+          <!-- destination flag -->
+          <g>
+            <path d="M234 64 v-18" stroke="#35313f" stroke-width="3"></path>
+            <path d="M234 46 l15 5.5 -15 5.5 Z" fill="#e2574f" stroke="#35313f" stroke-width="2" stroke-linejoin="round"></path>
+          </g>
+          <!-- the cart, en route -->
+          <g style="animation: trot 0.7s ease-in-out infinite">
+            <ellipse cx="104" cy="204" rx="16" ry="4" fill="#35313f" opacity="0.14"></ellipse>
+            <g transform="translate(86,176)">
+              <path d="M2 10 h14 l3 5 h4" stroke="#35313f" stroke-width="2.4" fill="none" stroke-linecap="round"></path>
+              <path d="M3.5 10 l2 5 h13.5" stroke="#35313f" stroke-width="2.4" fill="none"></path>
+              <circle cx="8" cy="22" r="4" fill="#fffdf6" stroke="#35313f" stroke-width="2.4"></circle>
+              <circle cx="18" cy="22" r="4" fill="#fffdf6" stroke="#35313f" stroke-width="2.4"></circle>
+              <path d="M26 15 q1 -8 7 -8 q5 0 5 6 v9" stroke="#35313f" stroke-width="2.4" fill="#d08b4a" stroke-linejoin="round"></path>
+              <path d="M32 7 l2 -4 2.5 3.2" stroke="#35313f" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"></path>
+            </g>
+          </g>
+        </svg>
+
+        <!-- driver card -->
+        <div style="display: flex; align-items: center; gap: 11px; border: 2px solid #e4d8c8; border-radius: 16px; background: #fffdf6; padding: 10px 12px">
+          <svg width="52" height="52" viewBox="0 0 52 52" style="flex-shrink: 0" aria-hidden="true">
+            <circle cx="26" cy="27" r="21" fill="#e8c9a0" stroke="#35313f" stroke-width="2.5"></circle>
+            <path d="M10 30 q4 10 16 10 q12 0 16 -10 v6 q-5 9 -16 9 q-11 0 -16 -9 Z" fill="#cdd3d8" stroke="#35313f" stroke-width="2"></path>
+            <ellipse cx="26" cy="12" rx="17" ry="6" fill="#ffe08a" stroke="#35313f" stroke-width="2.5"></ellipse>
+            <path d="M17 11 a9 7 0 0 1 18 0 Z" fill="#ffd977" stroke="#35313f" stroke-width="2.5"></path>
+            <circle cx="20" cy="24" r="2" fill="#2c2833"></circle>
+            <circle cx="32" cy="24" r="2" fill="#2c2833"></circle>
+            <ellipse cx="15.5" cy="29" rx="3" ry="2" fill="#ffb3ab"></ellipse>
+            <ellipse cx="36.5" cy="29" rx="3" ry="2" fill="#ffb3ab"></ellipse>
+          </svg>
+          <span style="display: flex; flex-direction: column; gap: 1px; min-width: 0">
+            <span style="font-weight: 800; font-size: 15px">Gideon the Carter</span>
+            <span style="font-weight: 600; font-size: 11.5px; color: #8d8496">&amp; Buttercup the pony</span>
+            <span style="display: inline-flex; align-items: center; gap: 4px; margin-top: 2px">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="#ffd977" stroke="#35313f" stroke-width="1.8"><path d="M12 2.5 l2.6 6 6.4 .6 -4.8 4.3 1.4 6.3 -5.6 -3.3 -5.6 3.3 1.4 -6.3 -4.8 -4.3 6.4 -.6 Z"></path></svg>
+              <span style="font-weight: 800; font-size: 12px">4.9</span>
+              <span style="font-weight: 600; font-size: 11px; color: #8d8496">· 1,204 hauls</span>
+            </span>
+          </span>
+          <span style="margin-left: auto; align-self: flex-start; font-weight: 800; font-size: 11px; letter-spacing: .06em; background: #fffdf6; border: 2px solid #35313f; border-radius: 8px; padding: 2px 8px; box-shadow: 0 2px 0 rgba(53,49,63,.16)">ASH·42</span>
+        </div>
+
+        <!-- message the carter -->
+        <div style="display: flex; align-items: center; gap: 9px">
+          <div style="flex-grow: 1; border: 2px solid #d9cfc4; background: #ffffff; border-radius: 999px; padding: 8px 14px; font-weight: 600; font-size: 13px; color: #8d8496">send a raven to Gideon…</div>
+          <span style="width: 38px; height: 38px; display: grid; place-items: center; background: #a8e6cf; border: 2.5px solid #35313f; border-radius: 999px; box-shadow: 0 3px 0 rgba(53,49,63,.2); cursor: pointer; flex-shrink: 0">
+            <svg width="17" height="15" viewBox="0 0 24 20" fill="#35313f"><path d="M2 12 q6 -10 13 -8 l7 -2 -5 5 q3 8 -6 11 q-6 2 -9 -6 Z"></path></svg>
+          </span>
+        </div>
+
+        <!-- footer -->
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-top: auto">
+          <span style="font-weight: 600; font-size: 11.5px; color: #8d8496">pony express · 8 gold · pay by pouch</span>
+          <span style="border: 2px solid #35313f; background: #ffd9d5; border-radius: 999px; padding: 4px 14px; font-weight: 700; font-size: 12.5px; box-shadow: 0 3px 0 rgba(53,49,63,.16); cursor: pointer">cancel</span>
+        </div>
+
+        <div style="display: flex; justify-content: center; padding-top: 2px">
+          <div style="width: 96px; height: 6px; background: #35313f; border-radius: 999px; opacity: .8"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

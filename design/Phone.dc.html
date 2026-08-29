@@ -1,0 +1,152 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&amp;display=swap">
+  <style>
+    body { margin: 0; font-family: "Baloo 2", "Trebuchet MS", system-ui, sans-serif; color: #35313f; }
+    a { color: #e2574f; } a:hover { color: #c9536b; }
+    .kbd { background: #35313f; color: #fffdf6; border-radius: 6px; padding: 1px 7px; font: 700 12px "Baloo 2", "Trebuchet MS", sans-serif; }
+    .app { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+    .app-icon { position: relative; width: 58px; height: 58px; border: 2.5px solid #35313f; border-radius: 17px;
+                display: grid; place-items: center; box-shadow: 0 4px 0 rgba(53,49,63,.16); }
+    .app-label { font-weight: 700; font-size: 11px; color: #35313f; }
+    .badge { position: absolute; top: -7px; right: -7px; min-width: 20px; height: 20px; padding: 0 5px;
+             display: grid; place-items: center; background: #e2574f; color: #fffdf6; border: 2px solid #35313f;
+             border-radius: 999px; font-weight: 800; font-size: 11px; }
+  </style>
+</helmet>
+<div style="position: relative; width: 1280px; height: 800px; overflow: hidden; background: #bfe6f7">
+
+  <!-- dimmed village behind the phone -->
+  <svg viewBox="0 0 1280 800" width="1280" height="800" style="position: absolute; inset: 0; filter: saturate(.85)" aria-hidden="true">
+    <rect width="1280" height="440" fill="#bfe6f7"></rect>
+    <circle cx="170" cy="110" r="42" fill="#ffd977"></circle>
+    <g fill="#ffffff" opacity="0.85">
+      <ellipse cx="940" cy="120" rx="64" ry="24"></ellipse>
+      <ellipse cx="992" cy="108" rx="40" ry="18"></ellipse>
+    </g>
+    <path d="M0 440 Q 320 380 640 424 T 1280 416 V 800 H 0 Z" fill="#8fd3a0"></path>
+    <rect x="0" y="490" width="1280" height="310" fill="#6fc07e"></rect>
+    <g stroke="#35313f" stroke-width="4" stroke-linejoin="round">
+      <rect x="150" y="380" width="180" height="126" rx="14" fill="#fff3dd"></rect>
+      <path d="M132 392 L240 306 L348 392 Q240 366 132 392 Z" fill="#f49b3d"></path>
+      <rect x="980" y="400" width="160" height="108" rx="13" fill="#fffdf6"></rect>
+      <path d="M964 410 L1060 332 L1156 410 Q1060 386 964 410 Z" fill="#ff9d96"></path>
+      <rect x="700" y="428" width="14" height="42" rx="6" fill="#b98a5a"></rect>
+      <circle cx="707" cy="398" r="40" fill="#63bf95"></circle>
+    </g>
+  </svg>
+  <div style="position: absolute; inset: 0; background: rgba(53,49,63,.34)"></div>
+
+  <!-- label -->
+  <div style="position: absolute; left: 160px; top: 240px; display: flex; flex-direction: column; gap: 12px; max-width: 330px">
+    <div style="display: inline-flex; align-items: center; gap: 9px; align-self: flex-start; background: #fffdf6; border: 2.5px solid #35313f; border-radius: 999px; padding: 6px 18px; font-weight: 800; font-size: 17px; box-shadow: 0 4px 0 rgba(53,49,63,.2)">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#35313f" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2.5" width="10" height="19" rx="3"></rect><path d="M10.5 18.5 h3"></path></svg>
+      the scrying glass
+    </div>
+    <div style="background: rgba(255,253,246,.92); border: 2px solid #35313f; border-radius: 14px; padding: 9px 14px; font-weight: 600; font-size: 13.5px; color: #6d6577; box-shadow: 0 4px 0 rgba(53,49,63,.16)">
+      A pocket mirror on the real world — raven-powered. Quests, ravenmail, and yes: you can summon a cart.
+    </div>
+  </div>
+
+  <!-- the phone -->
+  <div style="position: absolute; left: 660px; top: 26px; transform: rotate(-2deg)">
+    <!-- star sticker on the bezel -->
+    <svg width="52" height="52" viewBox="0 0 46 46" style="position: absolute; top: -14px; right: -16px; transform: rotate(14deg)" aria-hidden="true">
+      <path d="M23 4 l5.5 12.5 12.5 5.5 -12.5 5.5 -5.5 12.5 -5.5 -12.5 -12.5 -5.5 12.5 -5.5 Z" fill="#ffe08a" stroke="#35313f" stroke-width="2.5" stroke-linejoin="round"></path>
+    </svg>
+    <!-- side buttons -->
+    <div style="position: absolute; right: -6px; top: 140px; width: 6px; height: 46px; background: #35313f; border-radius: 0 4px 4px 0"></div>
+    <div style="position: absolute; right: -6px; top: 196px; width: 6px; height: 46px; background: #35313f; border-radius: 0 4px 4px 0"></div>
+
+    <div style="width: 340px; height: 736px; background: #fffdf6; border: 3px solid #35313f; border-radius: 46px; padding: 13px; box-shadow: 0 12px 0 rgba(53,49,63,.3)">
+      <div style="height: 100%; border: 2.5px solid #35313f; border-radius: 34px; overflow: hidden; background: linear-gradient(180deg, #bfe6f7 0%, #ffe9d2 82%, #ffd9d5 100%); display: flex; flex-direction: column; padding: 14px 16px 12px">
+
+        <!-- in-world status row -->
+        <div style="display: flex; align-items: center; justify-content: space-between; font-weight: 700; font-size: 12.5px; color: #35313f">
+          <span>17:42</span>
+          <span style="display: inline-flex; align-items: flex-end; gap: 4px">
+            <svg width="15" height="12" viewBox="0 0 24 20" fill="#35313f"><path d="M2 12 q6 -10 13 -8 l7 -2 -5 5 q3 8 -6 11 q-6 2 -9 -6 Z"></path></svg>
+            <span style="width: 4px; height: 5px; background: #35313f; border-radius: 2px"></span>
+            <span style="width: 4px; height: 8px; background: #35313f; border-radius: 2px"></span>
+            <span style="width: 4px; height: 11px; background: rgba(53,49,63,.3); border-radius: 2px"></span>
+          </span>
+        </div>
+
+        <!-- wallpaper greeting -->
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 2px; margin: 26px 0 30px">
+          <svg width="76" height="54" viewBox="0 0 76 54" aria-hidden="true">
+            <circle cx="50" cy="26" r="19" fill="#ffd977" stroke="#35313f" stroke-width="3"></circle>
+            <circle cx="44" cy="24" r="2.2" fill="#35313f"></circle>
+            <circle cx="56" cy="24" r="2.2" fill="#35313f"></circle>
+            <path d="M46 31 q4 3.5 8 0" stroke="#35313f" stroke-width="2.6" stroke-linecap="round" fill="none"></path>
+            <ellipse cx="18" cy="38" rx="15" ry="8" fill="#ffffff" stroke="#35313f" stroke-width="3"></ellipse>
+          </svg>
+          <div style="font-weight: 800; font-size: 21px">good evening, hero</div>
+          <div style="font-weight: 600; font-size: 12.5px; color: #a4666e">Ashford · clear · 18°C</div>
+        </div>
+
+        <!-- app grid -->
+        <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px 8px; margin: auto 0">
+          <div class="app">
+            <div class="app-icon" style="background: #ffe1b8">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#35313f" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3 h11 a2 2 0 0 1 2 2 v14 a2 2 0 0 1 -2 2 H7"></path><path d="M7 3 a2 2 0 0 0 -2 2 v14 a2 2 0 0 0 2 2"></path><path d="M9 8 h7"></path><path d="M9 12 h7"></path><path d="M9 16 h4"></path></svg>
+            </div>
+            <span class="app-label">quests</span>
+          </div>
+          <div class="app">
+            <div class="app-icon" style="background: #a8e6cf">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#35313f" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4 L3 6 v14 l6 -2 6 2 6 -2 V4 l-6 2 Z"></path><path d="M9 4 v14"></path><path d="M15 6 v14"></path></svg>
+            </div>
+            <span class="app-label">map</span>
+          </div>
+          <div class="app">
+            <div class="app-icon" style="background: #bfe6f7">
+              <span class="badge">3</span>
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#35313f" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M4 13 q7 -12 15 -9 l3 -1 -4 4 q3 9 -7 12 q-6 1.5 -8 -4 Z"></path><path d="M4 13 l-2 6 5 -3"></path><circle cx="15" cy="8" r="0.6" fill="#35313f"></circle></svg>
+            </div>
+            <span class="app-label">ravenmail</span>
+          </div>
+          <div class="app">
+            <div class="app-icon" style="background: #ffe08a">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#35313f" stroke-width="2.1"><circle cx="12" cy="12" r="8"></circle><circle cx="12" cy="12" r="3.6"></circle></svg>
+            </div>
+            <span class="app-label">market</span>
+          </div>
+          <div class="app">
+            <div class="app-icon" style="background: #ffaaa5">
+              <span class="badge" style="background: #63bf95">•</span>
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#35313f" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8 h13 l3 4 h2"></path><path d="M4 8 l2 4 h13"></path><path d="M6 12 v3"></path><path d="M17 12 v3"></path><circle cx="7.5" cy="17.5" r="2.2"></circle><circle cx="16.5" cy="17.5" r="2.2"></circle></svg>
+            </div>
+            <span class="app-label">cartly</span>
+          </div>
+          <div class="app">
+            <div class="app-icon" style="background: #f3eefb">
+              <svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="#35313f" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"></circle><path d="M19 12 a7 7 0 0 0 -.14 -1.4 l2 -1.55 -2 -3.46 -2.35 .95 A7 7 0 0 0 14 5.1 L13.6 2.6 h-3.2 L10 5.1 a7 7 0 0 0 -2.5 1.44 l-2.36 -.95 -2 3.46 2 1.55 A7 7 0 0 0 5 12 c0 .47 .05 .94 .14 1.4 l-2 1.55 2 3.46 2.35 -.95 A7 7 0 0 0 10 18.9 l.4 2.5 h3.2 l.4 -2.5 a7 7 0 0 0 2.5 -1.44 l2.35 .95 2 -3.46 -2 -1.55 c.09 -.46 .15 -.93 .15 -1.4 Z"></path></svg>
+            </div>
+            <span class="app-label">settings</span>
+          </div>
+        </div>
+
+        <!-- home pill -->
+        <div style="margin-top: auto; display: flex; justify-content: center; padding-top: 10px">
+          <div style="width: 96px; height: 6px; background: #35313f; border-radius: 999px; opacity: .8"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- put-away hint -->
+  <div style="position: absolute; left: 260px; bottom: 60px; background: rgba(255,253,246,.95); border: 2px solid #35313f; border-radius: 999px; padding: 7px 16px; font-weight: 700; box-shadow: 0 4px 0 rgba(53,49,63,.14)">
+    <span class="kbd">P</span> tuck it away
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

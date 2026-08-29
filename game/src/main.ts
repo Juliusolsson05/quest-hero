@@ -12,6 +12,9 @@ import { Bubbles } from './bubbles';
 import { Atmosphere } from './fx';
 import { Ui } from './ui';
 import { loadManifest } from './chars';
+import { initProps3d } from './props3d';
+import { CartService } from './taxi';
+import { CartlyPhone } from './cartly';
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -29,6 +32,7 @@ const entities = new Entities();
 scene.add(entities.group, player.view.root);
 const bubbles = new Bubbles();
 const ui = new Ui();
+const phone = new CartlyPhone();
 
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, player.camera));
@@ -56,6 +60,7 @@ net.on((f: ServerFrame) => {
         const built = buildIsland(f.island);
         scene.add(built.group);
         fx.attachWorld(built);
+        initProps3d(scene, island); // Tripo kawaii props + the parked fleet
         const spawn = f.island.pois.find((p) => p.id === 'plaza')?.pos ?? { x: 24, y: 2, z: 30 };
         player.bindIsland(island, new THREE.Vector3(spawn.x, spawn.y, spawn.z + 4));
         boardPos = (() => {
@@ -73,6 +78,7 @@ net.on((f: ServerFrame) => {
       fx.setTime(f.world.time.hour, f.world.time.phase);
       ui.setWeather(f.world.weather);
       ui.setTime(f.world.time);
+      phone.setWeather(f.world.weather.kind);
       break;
     }
     case 'pose': entities.applyPose(f); break;
@@ -84,6 +90,7 @@ net.on((f: ServerFrame) => {
     case 'weather':
       fx.setWeather(f.weather.kind);
       ui.setWeather(f.weather);
+      phone.setWeather(f.weather.kind);
       break;
     case 'time':
       fx.setTime(f.time.hour, f.time.phase);
@@ -118,9 +125,40 @@ ui.onSay = (npcId, text) => {
 };
 ui.onAccept = (id) => net.send({ t: 'quest', id, action: 'accept' });
 
+// ── Cartly: a real cart from the Tripo fleet rolls in over the Golden Gate ──
+const carts = new CartService(scene, player, () => island);
+phone.onSummon = (kind) => {
+  void carts.summon(kind);
+  ui.toast(`${carts.cartLabel} summoned — rolling in over the Golden Gate!`, '🚕');
+};
+phone.onCancel = () => carts.cancel();
+carts.onEta = (s) => phone.setEta(s);
+carts.onArrived = () => {
+  phone.arrived(carts.cartLabel);
+  ui.toast(`thy ${carts.cartLabel} has arrived — press E to hop in`, '🚕');
+};
+carts.onRideEnd = (dest) => {
+  phone.backToRequest();
+  phone.close();
+  ui.toast(`dropped at ${dest} — 5 stars for the driver? ⭐`, '🚕');
+};
+
+function nearestPoiLabel(): string {
+  let best = 'the village';
+  let bestD = Infinity;
+  for (const p of island?.island.pois ?? []) {
+    const d = (p.pos.x - player.pos.x) ** 2 + (p.pos.z - player.pos.z) ** 2;
+    if (d < bestD) { bestD = d; best = p.label; }
+  }
+  return best;
+}
+
 addEventListener('keydown', (e) => {
   if (e.code === 'Escape' && ui.questsOpen) ui.closeQuests();
-  if (e.code !== 'KeyE' || document.body.dataset.typing === '1') return;
+  if (document.body.dataset.typing === '1') return;
+  if (e.code === 'KeyP') { phone.setFrom(nearestPoiLabel()); phone.toggle(); return; }
+  if (e.code !== 'KeyE') return;
+  if (carts.nearCart()) { carts.board(); phone.close(); return; }
   const npc = entities.nearestNpc(player.pos, 3.4);
   if (npc) { ui.openTalk(npc.id, `${npc.name} · ${npc.role}`); return; }
   if (boardPos && boardPos.distanceTo(player.pos) < 3.2) ui.openQuests();
@@ -156,13 +194,15 @@ renderer.setAnimationLoop(() => {
   }
   const dt = Math.min(clock.getDelta(), 0.1);
   player.update(dt);
+  carts.update(dt); // after player.update so a ride overrides the hero's pose
   entities.update(dt);
   fx.update(dt, player.camera);
 
   // Interaction prompt.
   if (document.body.dataset.typing !== '1') {
     const npc = entities.nearestNpc(player.pos, 3.4);
-    if (npc) ui.setPrompt(`<kbd>E</kbd> talk to ${npc.name} 💬`);
+    if (carts.nearCart()) ui.setPrompt(`<kbd>E</kbd> hop into the ${carts.cartLabel} 🚕`);
+    else if (npc) ui.setPrompt(`<kbd>E</kbd> talk to ${npc.name} 💬`);
     else if (boardPos && boardPos.distanceTo(player.pos) < 3.2) ui.setPrompt(`<kbd>E</kbd> read the notice board 📋`);
     else ui.setPrompt(null);
   } else ui.setPrompt(null);

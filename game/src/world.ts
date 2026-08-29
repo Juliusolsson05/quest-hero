@@ -18,6 +18,10 @@ export const C = {
   cream: 0xfff3dd, coral: 0xff9d96, peach: 0xffd3b6, sky: 0xb5e2fa,
   pink: 0xffb7d5, yellow: 0xffe08a, white: 0xffffff, dark: 0x4a4a55,
   ember: 0xff7b3a, gold: 0xffd977,
+  // Little San Francisco
+  ggOrange: 0xe25b3d, concrete: 0xe8e0cf, concreteD: 0xdfd7c2,
+  glass: 0xa8cfe0, glassL: 0xd8ecf5, mint: 0xaee3c8, lav: 0xcdb8f0,
+  maroon: 0x8f3b3b, tam: 0xf7f3e8, tamB: 0xefe9db,
 };
 
 /** Box with per-face vertex shading baked in: bright top, dimmer sides,
@@ -308,6 +312,125 @@ function buildProps(props: Prop[], view: IslandView) {
         B(0.5, 1.0, 0, 0.12, 1.4, 0.12, C.woodD);
         B(0, 1.75, 0, 1.5, 0.16, 0.9, C.coral);
         break;
+
+      // ── Little San Francisco ──
+      case 'goldengate': {
+        // Spans the south channel: towers straddle the existing causeway, so
+        // the player walks the deck for free. Everything International Orange.
+        const O = C.ggOrange, legX = 1.7, towZ = 2.2;
+        for (const tz of [-towZ, towZ]) {
+          B(-legX, 3.4, tz, 0.55, 9.8, 0.55, O);           // tower legs
+          B(legX, 3.4, tz, 0.55, 9.8, 0.55, O);
+          B(0, 3.0, tz, 3.4, 0.45, 0.4, O);                // portal braces
+          B(0, 5.4, tz, 3.4, 0.42, 0.38, O);
+          B(0, 7.3, tz, 3.4, 0.4, 0.36, O);
+          B(0, 8.5, tz, 4.0, 0.5, 0.62, O);                // tower cap
+          B(0, 8.95, tz, 0.14, 0.4, 0.14, 0xe8443a);       // beacon
+        }
+        const cableY = (dz: number) => {
+          const a = Math.abs(dz);
+          return a >= towZ ? 8.2 - ((a - towZ) / 2.6) * 7.0
+                           : 3.1 + 5.1 * (dz / towZ) * (dz / towZ);
+        };
+        for (const sx of [-1, 1]) {
+          for (let dz = -4.8; dz <= 4.81; dz += 0.6)       // stepped main cables
+            B(sx * legX, cableY(dz), dz, 0.16, 0.16, 0.72, O);
+          for (const dz of [-3.6, -2.9, -1.5, -0.75, 0, 0.75, 1.5, 2.9, 3.6]) {
+            const cy = cableY(dz);                          // suspenders
+            if (cy > 1.4) B(sx * legX, (cy + 0.8) / 2, dz, 0.07, cy - 0.8, 0.07, O);
+          }
+          B(sx * legX, 0.1, -4.9, 0.8, 2.6, 0.9, C.stoneD); // anchorages
+          B(sx * legX, 0.1, 4.9, 0.8, 2.6, 0.9, C.stoneD);
+          B(sx * 1.45, 0.62, 0, 0.1, 0.45, 6.8, O);         // deck railings
+        }
+        break;
+      }
+      case 'transamerica': {
+        for (let i = 0; i < 8; i++) {                       // stepped pyramid
+          const w = 2.8 - i * 0.33;
+          B(0, 0.7 + i * 1.35, 0, w, 1.4, w, i % 2 ? C.tam : C.tamB);
+        }
+        B(-0.75, 8.2, 0, 0.3, 3.4, 0.6, C.tam);             // the wings
+        B(0.75, 8.2, 0, 0.3, 3.4, 0.6, C.tam);
+        B(0, 11.4, 0, 0.22, 1.6, 0.22, C.concreteD);        // spire
+        B(0, 12.3, 0, 0.14, 0.3, 0.14, C.gold);             // beacon
+        break;
+      }
+      case 'salesforce': {
+        for (let i = 0; i < 8; i++) {                       // glass barrel
+          B(0, 0.8 + i * 1.5, 0, 2.5, 1.5, 2.5, C.glass);
+          B(0, 1.45 + i * 1.5, 0, 2.62, 0.14, 2.62, C.glassL); // fin bands
+        }
+        B(0, 12.55, 0, 2.1, 0.9, 2.1, C.glass);             // rounding top
+        B(0, 13.25, 0, 1.5, 0.6, 1.5, C.glassL);
+        B(0, 13.7, 0, 0.9, 0.4, 0.9, 0xf2f7ff);             // crown display
+        glows.push({ pos: new THREE.Vector3(x, gy + 13.7, z), color: 0xcfe8ff, strength: 5 });
+        break;
+      }
+      case 'paintedladies': {
+        const row: [number, number][] = [
+          [C.mint, 0xfdf6e3], [C.sky, 0xfdf6e3], [C.pink, 0xfdf6e3],
+          [C.yellow, 0xfdf6e3], [C.lav, 0xfdf6e3],
+        ];
+        for (let i = 0; i < 5; i++) {                       // postcard row
+          const ox = (i - 2) * 2.0;
+          const [wall, trim] = row[i];
+          B(ox, 1.15, 0, 1.9, 2.3, 1.8, wall);              // body
+          B(ox, 2.4, 0, 1.95, 0.28, 1.85, trim);            // cornice
+          B(ox, 2.75, 0, 1.5, 0.5, 1.6, wall);              // stepped gable
+          B(ox, 3.12, 0, 0.95, 0.32, 1.4, trim);
+          B(ox, 3.36, 0, 0.5, 0.22, 1.2, wall);
+          B(ox + 0.42, 1.2, 0.98, 0.75, 1.6, 0.35, trim);   // bay window
+          B(ox + 0.42, 1.25, 1.17, 0.5, 0.6, 0.06, C.sky);
+          B(ox + 0.42, 2.0, 1.17, 0.5, 0.35, 0.06, C.sky);
+          B(ox - 0.5, 0.85, 0.92, 0.55, 1.2, 0.1, C.woodD); // door
+          B(ox - 0.5, 0.18, 1.12, 0.65, 0.36, 0.5, C.stoneD); // stoop
+          B(ox, 2.98, 0.83, 0.28, 0.3, 0.06, C.sky);        // attic window
+        }
+        break;
+      }
+      case 'coit': {
+        B(0, 0.35, 0, 2.0, 0.7, 2.0, C.stone);              // Telegraph Hill plinth
+        B(0, 3.6, 0, 1.15, 5.8, 1.15, C.concrete);          // fluted shaft:
+        add({ x, y: gy + 3.6, z, w: 1.15, h: 5.8, d: 1.15,  // two boxes, 45° apart
+              color: C.concrete, rot: r + Math.PI / 4 });
+        B(0, 6.7, 0, 1.45, 0.5, 1.45, C.concrete);          // arcade ring
+        add({ x, y: gy + 6.7, z, w: 1.45, h: 0.5, d: 1.45,
+              color: C.concreteD, rot: r + Math.PI / 4 });
+        B(0, 7.1, 0, 1.0, 0.4, 1.0, C.concreteD);           // crown
+        break;
+      }
+      case 'sutro': {
+        const legs: [number, number][] = [[-0.85, -0.5], [0.85, -0.5], [0, 0.85]];
+        for (const [lx, lz] of legs) {
+          B(lx, 2.2, lz, 0.3, 4.4, 0.3, 0xf2f4f6);          // lower legs, white
+          B(lx, 1.1, lz, 0.34, 0.9, 0.34, C.ggOrange);      // orange socks
+          B(lx * 0.55, 6.2, lz * 0.55, 0.26, 3.6, 0.26, C.ggOrange); // upper legs
+        }
+        B(0, 4.6, 0, 2.3, 0.35, 2.0, C.ggOrange);           // waist platform
+        B(0, 8.1, 0, 1.6, 0.3, 1.5, 0xf2f4f6);              // top platform
+        for (const [lx, lz] of legs)
+          B(lx * 0.42, 9.6, lz * 0.42, 0.16, 2.8, 0.16, 0xf2f4f6); // antennas
+        B(0, 10.4, 0, 1.9, 0.12, 0.12, C.ggOrange);         // cross arm
+        break;
+      }
+      case 'cablecar': {
+        B(0, 0.05, -0.42, 3.2, 0.1, 0.12, 0x6b6470);        // rails
+        B(0, 0.05, 0.42, 3.2, 0.1, 0.12, 0x6b6470);
+        B(-0.6, 0.16, 0, 0.28, 0.22, 1.06, 0x3a3a42);       // wheel trucks
+        B(0.6, 0.16, 0, 0.28, 0.22, 1.06, 0x3a3a42);
+        B(0, 0.5, 0, 2.4, 0.55, 1.0, C.maroon);             // chassis
+        B(0, 1.0, 0, 1.5, 0.55, 1.02, 0xf5e9d0);            // cream cabin band
+        B(-0.35, 1.05, 0, 0.45, 0.35, 1.06, C.sky);         // windows
+        B(0.35, 1.05, 0, 0.45, 0.35, 1.06, C.sky);
+        B(-1.05, 0.95, 0, 0.3, 0.85, 1.02, C.maroon);       // end posts
+        B(1.05, 0.95, 0, 0.3, 0.85, 1.02, C.maroon);
+        B(0, 1.38, 0, 2.6, 0.16, 1.15, 0x6e4a35);           // roof
+        B(0, 1.5, 0, 1.2, 0.12, 0.7, C.maroon);             // roof monitor
+        B(0, 0.62, 0.52, 2.42, 0.1, 0.04, C.gold);          // gold beltline
+        B(0, 0.62, -0.52, 2.42, 0.1, 0.04, C.gold);
+        break;
+      }
     }
   }
 

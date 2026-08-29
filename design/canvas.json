@@ -6,10 +6,14 @@
     { "file": "Settings.dc.html", "title": "Settings", "x": 0, "y": 920, "w": 1280, "h": 800 },
     { "file": "QuestBoard.dc.html", "title": "Quest board", "x": 1360, "y": 920, "w": 480, "h": 800 },
     { "file": "Bubbles.dc.html", "title": "Dialog bubbles", "x": 1920, "y": 920, "w": 960, "h": 800 },
-    { "file": "Components.dc.html", "title": "Core kit", "x": 2960, "y": 920, "w": 1040, "h": 860 }
+    { "file": "Components.dc.html", "title": "Core kit", "x": 2960, "y": 920, "w": 1040, "h": 860 },
+    { "file": "Phone.dc.html", "title": "Scrying glass — in game", "x": 0, "y": 1900, "w": 1280, "h": 800 },
+    { "file": "RideRequest.dc.html", "title": "Cartly · request", "x": 1360, "y": 1900, "w": 400, "h": 820 },
+    { "file": "RideOnWay.dc.html", "title": "Cartly · on the way", "x": 1840, "y": 1900, "w": 400, "h": 820 }
   ],
   "annotations": [
-    { "id": "kit-note", "x": 0, "y": -170, "w": 520, "text": "Quest Hero — Ashford · kawaii UI kit\nMatches the game's live CSS: Baloo 2, ink #35313f on cream #fffdf6, 2.5px outlines, hard offset shadows, pill radii.\nScreens on top; quest board, the bubble set and core components below — everything maps 1:1 onto the existing classes (.chip, .toast, .bub, #talkbar, #questpanel)." }
+    { "id": "kit-note", "x": 0, "y": -170, "w": 520, "text": "Quest Hero — Ashford · kawaii UI kit\nMatches the game's live CSS: Baloo 2, ink #35313f on cream #fffdf6, 2.5px outlines, hard offset shadows, pill radii.\nScreens on top; quest board, the bubble set and core components below — everything maps 1:1 onto the existing classes (.chip, .toast, .bub, #talkbar, #questpanel)." },
+    { "id": "phone-note", "x": 2330, "y": 1920, "w": 330, "text": "The scrying glass — press P in game.\nCartly is the ride-hailing beat: original parody branding (Uber's own logo/UI is trademarked), same kit tokens. The fare line is the demo hook — prices scried live from real SF streets by the ravens (Bright Data), gold conversion yours to invent." }
   ],
   "launch": { "view": "canvas" }
 }

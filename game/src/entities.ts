@@ -19,7 +19,7 @@ export class Entities {
   syncNpcs(list: Npc[]): void {
     for (const n of list) {
       if (this.npcs.has(n.id)) continue;
-      const view = new CharacterView(n.id, parseInt(n.bubbleTint?.replace('#', '') || 'ffd3b6', 16), 1.5);
+      const view = new CharacterView(n.id, parseInt(n.bubbleTint?.replace('#', '') || 'ffd3b6', 16), 1.5, n.look);
       view.root.position.set(n.pos.x, n.pos.y, n.pos.z);
       view.root.rotation.y = n.rot;
       this.group.add(view.root);

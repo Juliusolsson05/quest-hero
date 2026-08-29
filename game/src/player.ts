@@ -59,6 +59,15 @@ export class Player {
     this.pos.y = this.groundY;
   }
 
+  /** Drop the hero somewhere else on the island (cart rides, cutscenes). */
+  teleport(to: THREE.Vector3): void {
+    this.pos.set(to.x, to.y, to.z);
+    if (this.island) {
+      this.groundY = this.island.heightAt(to.x, to.z);
+      this.pos.y = this.groundY;
+    }
+  }
+
   update(dt: number): void {
     const fwd = Number(this.keys.has('KeyW')) - Number(this.keys.has('KeyS'));
     const str = Number(this.keys.has('KeyD')) - Number(this.keys.has('KeyA'));

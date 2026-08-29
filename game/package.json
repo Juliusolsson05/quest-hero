@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "deploy": "npm run build && cd dist && vercel link --yes --project sf-quest --scope gustifinks-projects && vercel deploy --prod --yes"
   },
   "dependencies": {
     "playroomkit": "^0.0.97",

@@ -24,3 +24,4 @@ build/
 
 # TrueForge local state (SQLite lives in ~/Library/Application Support/trueforge)
 .trueforge/
+.vercel

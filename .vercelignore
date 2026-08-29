@@ -1,0 +1,11 @@
+# Only the game build inputs and the mcp sources the /api functions import
+# need to reach Vercel. Everything stateful deploys to Railway instead.
+.claude
+design
+docs
+hub
+scripts
+tools
+deploy
+**/node_modules
+game/dist

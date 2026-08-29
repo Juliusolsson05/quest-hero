@@ -1,77 +1,116 @@
 import * as THREE from 'three';
-import { state } from './state';
+import type { AnimName } from '../../shared/protocol';
+import type { IslandView } from './world';
+import { CharacterView } from './chars';
 
 /**
- * First-person controller.
- *
- * Uses Pointer Lock rather than orbit controls because the player needs to
- * physically walk up to an NPC to talk to it — proximity is the trigger, so
- * movement has to feel direct.
+ * Third-person controller: the hero walks the island, a spring-arm camera
+ * follows. Drag to orbit, wheel to zoom, WASD moves relative to the camera,
+ * Shift runs. Collision is the island height grid — step up one block, never
+ * into water — which is all a village stroll needs.
  */
 export class Player {
   readonly camera: THREE.PerspectiveCamera;
-  private yaw = 0;
-  private pitch = 0;
+  readonly view: CharacterView;
+  readonly pos = new THREE.Vector3();
+  rot = 0;
+  anim: AnimName = 'idle';
+
+  private island: IslandView | null = null;
   private readonly keys = new Set<string>();
-  private readonly velocity = new THREE.Vector3();
-  private locked = false;
+  private camYaw = Math.PI * 0.85;
+  private camPitch = 0.52;
+  private camDist = 7.5;
+  private dragging = false;
+  private groundY = 2;
 
-  /** Eye height in metres. Anything much lower reads as crouching. */
-  private static readonly EYE = 1.7;
-  private static readonly SPEED = 4.5;
+  private static readonly WALK = 3.4;
+  private static readonly RUN = 6.4;
 
-  constructor(private readonly dom: HTMLElement) {
-    this.camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.1, 200);
-    this.camera.position.set(0, Player.EYE, 6);
+  constructor(dom: HTMLElement) {
+    this.camera = new THREE.PerspectiveCamera(58, innerWidth / innerHeight, 0.1, 260);
+    this.view = new CharacterView('hero', 0xa8e6cf, 1.5);
 
     addEventListener('keydown', (e) => {
-      // Ignore keystrokes while the player is typing to an NPC, or WASD would
-      // walk them away mid-sentence.
       if (document.body.dataset.typing === '1') return;
       this.keys.add(e.code);
     });
     addEventListener('keyup', (e) => this.keys.delete(e.code));
+    addEventListener('blur', () => this.keys.clear());
 
-    document.addEventListener('pointerlockchange', () => {
-      this.locked = document.pointerLockElement === this.dom;
-      // Dropping the lock while keys are held would leave the player sliding.
-      if (!this.locked) this.keys.clear();
+    dom.addEventListener('pointerdown', (e) => {
+      if (e.button === 0) { this.dragging = true; dom.setPointerCapture(e.pointerId); }
     });
-
-    addEventListener('mousemove', (e) => {
-      if (!this.locked) return;
-      this.yaw -= e.movementX * 0.0022;
-      this.pitch -= e.movementY * 0.0022;
-      // Clamp just short of straight up/down; hitting the pole makes the
-      // camera basis degenerate and the view rolls.
-      const limit = Math.PI / 2 - 0.02;
-      this.pitch = Math.max(-limit, Math.min(limit, this.pitch));
+    addEventListener('pointerup', () => { this.dragging = false; });
+    addEventListener('pointermove', (e) => {
+      if (!this.dragging) return;
+      this.camYaw -= e.movementX * 0.0055;
+      this.camPitch = THREE.MathUtils.clamp(this.camPitch + e.movementY * 0.004, 0.12, 1.25);
     });
+    addEventListener('wheel', (e) => {
+      this.camDist = THREE.MathUtils.clamp(this.camDist + Math.sign(e.deltaY) * 0.8, 3.5, 13);
+    }, { passive: true });
   }
 
-  requestLock(): void {
-    this.dom.requestPointerLock();
+  bindIsland(island: IslandView, spawn: THREE.Vector3): void {
+    this.island = island;
+    this.pos.copy(spawn);
+    this.groundY = island.heightAt(spawn.x, spawn.z);
+    this.pos.y = this.groundY;
   }
 
   update(dt: number): void {
-    this.camera.rotation.set(this.pitch, this.yaw, 0, 'YXZ');
+    const fwd = Number(this.keys.has('KeyW')) - Number(this.keys.has('KeyS'));
+    const str = Number(this.keys.has('KeyD')) - Number(this.keys.has('KeyA'));
+    const running = this.keys.has('ShiftLeft') || this.keys.has('ShiftRight');
+    const moving = (fwd !== 0 || str !== 0) && this.island;
 
-    const forward = Number(this.keys.has('KeyW')) - Number(this.keys.has('KeyS'));
-    const strafe = Number(this.keys.has('KeyD')) - Number(this.keys.has('KeyA'));
+    if (moving && this.island) {
+      const speed = running ? Player.RUN : Player.WALK;
+      const dir = new THREE.Vector3(str, 0, -fwd)
+        .normalize()
+        .applyAxisAngle(new THREE.Vector3(0, 1, 0), this.camYaw);
+      // Axis-separated moves so we slide along blocked tiles instead of sticking.
+      const from = this.island.heightAt(this.pos.x, this.pos.z);
+      const nx = this.pos.x + dir.x * speed * dt;
+      if (this.island.walkable(nx, this.pos.z, from)) this.pos.x = nx;
+      const nz = this.pos.z + dir.z * speed * dt;
+      if (this.island.walkable(this.pos.x, nz, this.island.heightAt(this.pos.x, this.pos.z))) this.pos.z = nz;
 
-    this.velocity.set(strafe, 0, -forward);
-    if (this.velocity.lengthSq() > 0) {
-      // Normalise so diagonal movement isn't faster than cardinal.
-      this.velocity.normalize().applyAxisAngle(new THREE.Vector3(0, 1, 0), this.yaw);
-      this.camera.position.addScaledVector(this.velocity, Player.SPEED * dt);
+      this.groundY = this.island.heightAt(this.pos.x, this.pos.z);
+      const target = Math.atan2(dir.x, dir.z);
+      // Shortest-path angle lerp so the hero turns, not spins.
+      let d = target - this.rot;
+      while (d > Math.PI) d -= Math.PI * 2;
+      while (d < -Math.PI) d += Math.PI * 2;
+      this.rot += d * Math.min(1, dt * 14);
+      this.anim = running ? 'run' : 'walk';
+    } else {
+      this.anim = 'idle';
     }
 
-    // Soft bounds keep the player on the built area without collision meshes.
-    this.camera.position.x = Math.max(-24, Math.min(24, this.camera.position.x));
-    this.camera.position.z = Math.max(-24, Math.min(24, this.camera.position.z));
-    this.camera.position.y = Player.EYE;
+    // Smooth step up/down.
+    this.pos.y += (this.groundY - this.pos.y) * Math.min(1, dt * 12);
 
-    const p = this.camera.position;
-    state.player.position = { x: +p.x.toFixed(2), y: +p.y.toFixed(2), z: +p.z.toFixed(2) };
+    this.view.setAnim(this.anim);
+    this.view.update(dt);
+    this.view.root.position.copy(this.pos);
+    this.view.root.rotation.y = this.rot;
+
+    // Spring-arm camera.
+    const target = new THREE.Vector3(this.pos.x, this.pos.y + 1.35, this.pos.z);
+    const off = new THREE.Vector3(
+      Math.sin(this.camYaw) * Math.cos(this.camPitch),
+      Math.sin(this.camPitch),
+      Math.cos(this.camYaw) * Math.cos(this.camPitch),
+    ).multiplyScalar(this.camDist);
+    const wanted = target.clone().add(off);
+    // Keep the camera above the terrain skin.
+    if (this.island) {
+      const ch = this.island.heightAt(wanted.x, wanted.z);
+      wanted.y = Math.max(wanted.y, ch + 0.6);
+    }
+    this.camera.position.lerp(wanted, Math.min(1, dt * 10));
+    this.camera.lookAt(target);
   }
 }

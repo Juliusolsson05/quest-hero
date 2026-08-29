@@ -119,6 +119,24 @@ The hackathon asks for an interface that shows what the agent is doing, what it 
 
 Open source, as the hackathon requires.
 
+## Build docs
+
+- [docs/SPEC.md](docs/SPEC.md) — the v2 build spec (voxel world, World Hub, live-data village)
+- [docs/API.md](docs/API.md) — the World Hub REST/WS/SSE contract the MCP servers wrap
+- [docs/ASSETS-PIPELINE.md](docs/ASSETS-PIPELINE.md) — Tripo character pipeline cheatsheet
+
+## Run it
+
+```bash
+npx @truefoundry/trueforge@latest        # 1. harness on :8790 (paste a model key in Settings → Models)
+npm --prefix hub install && npm --prefix hub run dev    # 2. World Hub on :7777
+npm --prefix game install && npm --prefix game run dev  # 3. game on :5173
+node tools/tripo.mjs                     # optional: generate rigged characters (needs TRIPO_API_KEY in .env)
+```
+
+The game is fully playable with zero keys configured: NPCs fall back to canned lines until
+TrueForge has a model, and characters use kawaii voxel placeholders until Tripo GLBs land.
+
 ## Status
 
-Early. The brief and architecture are settled; implementation starts now.
+Specs frozen (docs/SPEC.md), World Hub + voxel third-person client implemented, wiring in progress.

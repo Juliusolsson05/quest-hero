@@ -3,37 +3,93 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Quest Hero</title>
+    <title>Quest Hero — Ashford</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&display=swap" />
     <style>
-      :root { color-scheme: dark; }
       * { margin: 0; padding: 0; box-sizing: border-box; }
-      body { overflow: hidden; background: #0b0e14; font: 14px/1.5 system-ui, sans-serif; color: #e6e6e6; }
+      body { overflow: hidden; background: #bfe6f7; color: #35313f;
+             font: 15px/1.5 "Baloo 2", "Trebuchet MS", system-ui, sans-serif; }
       canvas { display: block; }
+      kbd { background: #35313f; color: #fffdf6; border-radius: 6px; padding: 1px 7px; font: inherit; }
 
-      /* Everything below is HUD painted over the canvas. Kept in plain DOM
-         rather than rendered in 3D because dialogue is text-heavy and needs
-         to stay readable and selectable. */
-      #crosshair { position: fixed; left: 50%; top: 50%; width: 6px; height: 6px;
-        margin: -3px 0 0 -3px; border-radius: 50%; background: #fff; opacity: .6; pointer-events: none; }
-      #prompt { position: fixed; left: 50%; bottom: 22%; transform: translateX(-50%);
-        padding: 8px 14px; background: rgba(0,0,0,.65); border: 1px solid #2b3245;
-        border-radius: 6px; opacity: 0; transition: opacity .15s; pointer-events: none; }
+      /* HUD chips */
+      #hud { position: fixed; top: 14px; left: 14px; display: flex; gap: 8px; z-index: 15; flex-wrap: wrap; }
+      .chip { background: rgba(255,253,246,.92); border: 2px solid #35313f; border-radius: 999px;
+              padding: 3px 13px; font-weight: 700; font-size: 13.5px; box-shadow: 0 3px 0 rgba(53,49,63,.14); }
+      .chip.dim { opacity: .65; }
+
+      /* toasts */
+      #toasts { position: fixed; right: 14px; top: 14px; display: flex; flex-direction: column;
+                gap: 8px; z-index: 15; max-width: 320px; align-items: flex-end; }
+      .toast { background: rgba(255,253,246,.95); border: 2px solid #35313f; border-radius: 14px;
+               padding: 7px 13px; font-weight: 600; font-size: 13.5px; box-shadow: 0 4px 0 rgba(53,49,63,.14);
+               animation: t-in .3s cubic-bezier(.34,1.56,.64,1); transition: opacity .4s, transform .4s; }
+      .toast.out { opacity: 0; transform: translateX(20px); }
+      @keyframes t-in { from { transform: translateY(-12px) scale(.9); opacity: 0; } }
+
+      /* interact prompt */
+      #prompt { position: fixed; left: 50%; bottom: 15%; transform: translateX(-50%);
+                background: rgba(255,253,246,.95); border: 2px solid #35313f; border-radius: 999px;
+                padding: 7px 16px; font-weight: 700; opacity: 0; transition: opacity .15s;
+                pointer-events: none; z-index: 15; box-shadow: 0 4px 0 rgba(53,49,63,.14); }
       #prompt.on { opacity: 1; }
-      kbd { background: #2b3245; border-radius: 3px; padding: 1px 6px; font: inherit; }
-      #start { position: fixed; inset: 0; display: grid; place-content: center; gap: 10px;
-        text-align: center; background: rgba(11,14,20,.92); cursor: pointer; z-index: 10; }
-      #start h1 { font-size: 34px; letter-spacing: -.02em; }
-      #start p { color: #8b94a8; }
+
+      /* talk bar */
+      #talkbar { position: fixed; left: 50%; bottom: 4.5vh; transform: translateX(-50%) translateY(20px);
+                 width: min(560px, 92vw); background: rgba(255,253,246,.97); border: 2.5px solid #35313f;
+                 border-radius: 20px; padding: 10px 14px; z-index: 20; opacity: 0; pointer-events: none;
+                 transition: opacity .18s, transform .18s; box-shadow: 0 6px 0 rgba(53,49,63,.16); }
+      #talkbar.on { opacity: 1; transform: translateX(-50%); pointer-events: auto; }
+      #talkbar .t-who { font-weight: 800; font-size: 13px; color: #a4666e; margin: 0 4px 4px;
+                        text-transform: uppercase; letter-spacing: .05em; }
+      #talkbar .t-input { width: 100%; border: 2px solid #d9cfc4; background: #fff; border-radius: 12px;
+                          padding: 8px 12px; font: 600 15px "Baloo 2", sans-serif; color: inherit; outline: none; }
+      #talkbar .t-input:focus { border-color: #ffaaa5; }
+
+      /* quest board */
+      #questpanel { position: fixed; right: 16px; top: 60px; width: min(360px, 92vw); max-height: 74vh;
+                    background: rgba(255,251,240,.98); border: 2.5px solid #35313f; border-radius: 18px;
+                    z-index: 22; display: none; flex-direction: column; overflow: hidden;
+                    box-shadow: 0 8px 0 rgba(53,49,63,.16); }
+      #questpanel.on { display: flex; }
+      .q-head { font-weight: 800; font-size: 16px; padding: 10px 14px; background: #ffe1b8;
+                border-bottom: 2px solid #35313f; display: flex; justify-content: space-between; align-items: center; }
+      .q-close { border: none; background: none; font: 700 15px "Baloo 2"; cursor: pointer; }
+      .q-list { overflow-y: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 10px; }
+      .q-item { border: 2px solid #e4d8c8; border-radius: 14px; padding: 9px 12px; background: #fffdf6; }
+      .q-item.active { border-color: #a8e6cf; }
+      .q-item.done { opacity: .6; }
+      .q-title { font-weight: 800; }
+      .q-state { font-size: 11px; background: #ffaaa5; color: #fff; border-radius: 999px; padding: 1px 8px;
+                 vertical-align: 2px; margin-left: 4px; }
+      .q-item.active .q-state { background: #63bf95; }
+      .q-pitch { font-size: 13.5px; color: #6d6577; margin: 2px 0 6px; }
+      .q-steps { font-size: 13px; display: flex; flex-direction: column; gap: 2px; }
+      .q-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; font-size: 13px; }
+      .q-accept { border: 2px solid #35313f; background: #a8e6cf; border-radius: 999px; padding: 3px 14px;
+                  font: 700 13.5px "Baloo 2"; cursor: pointer; box-shadow: 0 3px 0 rgba(53,49,63,.2); }
+      .q-accept:active { transform: translateY(2px); box-shadow: none; }
+      .q-empty { color: #8d8496; font-weight: 600; padding: 8px; }
+
+      /* start overlay */
+      #start { position: fixed; inset: 0; display: grid; place-content: center; gap: 12px; text-align: center;
+               background: linear-gradient(180deg, #bfe6f7 0%, #ffe9d2 78%, #ffd9d5 100%); cursor: pointer; z-index: 40; }
+      #start h1 { font-size: 54px; font-weight: 800; letter-spacing: -.01em; color: #35313f;
+                  text-shadow: 0 4px 0 rgba(255,255,255,.6); }
+      #start .sub { font-weight: 700; color: #7a6f85; }
+      #start .keys { color: #8d8496; font-weight: 600; font-size: 14px; }
+      #start .go { margin-top: 8px; font-weight: 800; color: #e2574f; animation: pulse 1.6s infinite; }
       #start.hidden { display: none; }
+      @keyframes pulse { 50% { opacity: .5; } }
     </style>
   </head>
   <body>
-    <div id="crosshair"></div>
-    <div id="prompt"></div>
     <div id="start">
-      <h1>Quest Hero</h1>
-      <p>WASD to move &middot; mouse to look &middot; <kbd>E</kbd> to talk</p>
-      <p style="color:#4c5570">Click to begin</p>
+      <h1>🏘️ Quest Hero</h1>
+      <div class="sub">Ashford — a tiny village that lives on real data</div>
+      <div class="keys">WASD move · Shift run · drag to look · wheel zoom · <kbd>E</kbd> talk / read</div>
+      <div class="go">click to step off the boat ✨</div>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>

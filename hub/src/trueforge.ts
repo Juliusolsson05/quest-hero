@@ -262,8 +262,10 @@ export interface TurnCallbacks {
   onTool?: (label: string) => void;
   /** a subagent thread spun up (its text stays out of the bubble) */
   onThread?: (title: string) => void;
-  /** any stream activity at all — the caller's stall watchdog */
-  onEvent?: () => void;
+  /** fires on every event off the wire — reasoning deltas, system tool
+   *  calls, keep-alives — so a stall watchdog measures a dead stream, not a
+   *  quiet one */
+  onActivity?: () => void;
 }
 
 /** A turn ended paused: the agent needs something from the player. */
@@ -342,7 +344,7 @@ export async function streamTurn(
   };
 
   for await (const { data: event } of stream.withMetadata()) {
-    cb.onEvent?.();
+    cb.onActivity?.();
     if (isEventDelta(event)) {
       const base = events.get(event.id);
       if (base) mergeEventDelta(base, event);

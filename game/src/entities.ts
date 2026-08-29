@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { Animal, Npc, ServerFrame, WObject } from '../../shared/protocol';
 import { AnimalView, CharacterView } from './chars';
 import { objectMesh } from './world';
+import { angleToward } from './util';
 
 /**
  * Views for everything the hub animates: NPCs, critters, spawned objects.
@@ -97,19 +98,13 @@ export class Entities {
     const k = Math.min(1, dt * 8);
     for (const e of this.npcs.values()) {
       e.view.root.position.lerp(e.target, k);
-      let d = e.rot - e.view.root.rotation.y;
-      while (d > Math.PI) d -= Math.PI * 2;
-      while (d < -Math.PI) d += Math.PI * 2;
-      e.view.root.rotation.y += d * k;
+      e.view.root.rotation.y = angleToward(e.view.root.rotation.y, e.rot, k);
       e.view.update(dt);
     }
     for (const e of this.animals.values()) {
       const speed = e.kind === 'butterfly' ? 3.5 : 6;
       e.view.root.position.lerp(e.target, Math.min(1, dt * speed));
-      let d = e.rot - e.view.root.rotation.y;
-      while (d > Math.PI) d -= Math.PI * 2;
-      while (d < -Math.PI) d += Math.PI * 2;
-      e.view.root.rotation.y += d * Math.min(1, dt * 6);
+      e.view.root.rotation.y = angleToward(e.view.root.rotation.y, e.rot, dt * 6);
       e.view.update(dt);
     }
     for (let i = this.pops.length - 1; i >= 0; i--) {

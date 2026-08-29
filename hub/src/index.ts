@@ -14,7 +14,7 @@ import { startChatter } from './chatter';
 import { CONFIG } from './config';
 import { registerAgents, talk } from './dialogue';
 import { startIngest } from './ingest';
-import { island } from './island';
+import { island } from '../../shared/island';
 import { engagePlayer, startSim } from './sim';
 import {
   acceptQuest,

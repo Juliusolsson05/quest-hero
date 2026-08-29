@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { shadedBox as shadedVoxel } from './voxel';
 import type { Island, ObjectKind, Prop } from '../../shared/protocol';
 
 /**
@@ -23,22 +24,19 @@ export const C = {
   glass: 0xa8cfe0, glassL: 0xd8ecf5, mint: 0xaee3c8, lav: 0xcdb8f0,
   maroon: 0x8f3b3b, tam: 0xf7f3e8, tamB: 0xefe9db,
   asphalt: 0x7d8090, deck: 0x6f7280, cream2: 0xfdf6e3,
+  // The open sea beyond the grid: the composite of a translucent water tile
+  // over its dark bed, so the two meet without a seam.
+  seaFar: 0x70bfd6,
 };
 
-/** Box with per-face vertex shading baked in: bright top, dimmer sides,
- *  darkest bottom. Multiplied with material/instance colour, it gives the
- *  clean "voxel" read without any lighting tricks. */
+/** Top of the water. Tiles sit 0..0.84; land starts at 1, so a beach stands a
+ *  fifth of a block proud of the sea. Everything that floats reads from here. */
+export const SEA_Y = 0.84;
+
+// Terrain wants the hardest contrast of the three shade sets in the game.
+const SHADES = { top: 1.0, bottom: 0.55, sideX: 0.78, sideZ: 0.9 };
 function shadedBox(w = 1, h = 1, d = 1): THREE.BoxGeometry {
-  const g = new THREE.BoxGeometry(w, h, d);
-  const n = g.getAttribute('normal');
-  const colors = new Float32Array(n.count * 3);
-  for (let i = 0; i < n.count; i++) {
-    const ny = n.getY(i), nx = n.getX(i);
-    const v = ny > 0.5 ? 1.0 : ny < -0.5 ? 0.55 : Math.abs(nx) > 0.5 ? 0.78 : 0.9;
-    colors[i * 3] = colors[i * 3 + 1] = colors[i * 3 + 2] = v;
-  }
-  g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-  return g;
+  return shadedVoxel(w, h, d, SHADES);
 }
 
 const UNIT = shadedBox();
@@ -65,18 +63,24 @@ export class IslandView {
     return this.tileAt(x, z) !== '~' && h >= 1 && h - fromH <= 1;
   }
   /**
-   * Terrain-walkable AND not stepping into a solid prop. Entering a footprint
-   * is blocked; from inside one only outward moves pass (self-rescue).
+   * Does this step push into a solid prop? Entering a footprint is blocked;
+   * from inside one only outward moves pass (self-rescue), so nobody can be
+   * wedged permanently inside a wall.
    */
-  canMove(fromX: number, fromZ: number, toX: number, toZ: number): boolean {
-    if (!this.walkable(toX, toZ, this.heightAt(fromX, fromZ))) return false;
+  blocked(fromX: number, fromZ: number, toX: number, toZ: number): boolean {
     for (const o of this.blockers) {
       const dn = Math.hypot(toX - o.x, toZ - o.z);
       if (dn >= o.r) continue;
       const dp = Math.hypot(fromX - o.x, fromZ - o.z);
-      if (dn < dp - 1e-6) return false; // inward blocked; tangential/outward slides free
+      if (dn < dp - 1e-6) return true; // inward blocked; tangential/outward slides free
     }
-    return true;
+    return false;
+  }
+
+  /** Terrain-walkable AND not stepping into a solid prop. */
+  canMove(fromX: number, fromZ: number, toX: number, toZ: number): boolean {
+    return this.walkable(toX, toZ, this.heightAt(fromX, fromZ))
+      && !this.blocked(fromX, fromZ, toX, toZ);
   }
   /**
    * How far (0..1) the camera may travel from `from` toward `to` before a
@@ -114,6 +118,30 @@ export interface BuiltWorld {
   smoke: THREE.Vector3[];
   fountains: THREE.Vector3[];
   water: THREE.InstancedMesh | null;
+  sea: THREE.Group;
+}
+
+/**
+ * The sea past the tile grid: four quads framing the island out to well beyond
+ * the fog, so distance swallows the water rather than an edge cutting it off.
+ * A frame rather than one big plane, so nothing overlaps the island's own
+ * translucent tiles and their dark bed.
+ */
+function buildOpenSea(size: number): THREE.Group {
+  const g = new THREE.Group();
+  const R = 700;
+  const mat = new THREE.MeshStandardMaterial({ color: C.seaFar, roughness: 0.4 });
+  const quad = (x0: number, z0: number, x1: number, z1: number) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(x1 - x0, z1 - z0), mat);
+    m.rotation.x = -Math.PI / 2;
+    m.position.set((x0 + x1) / 2, SEA_Y, (z0 + z1) / 2);
+    g.add(m);
+  };
+  quad(-R, -R, size + R, 0);           // north of the grid
+  quad(-R, size, size + R, size + R);  // south
+  quad(-R, 0, 0, size);                // west
+  quad(size, 0, size + R, size);       // east
+  return g;
 }
 
 export function buildIsland(island: Island): BuiltWorld {
@@ -210,8 +238,11 @@ export function buildIsland(island: Island): BuiltWorld {
   group.add(built.mesh);
   for (const m of built.extras) group.add(m);
 
+  const sea = buildOpenSea(size);
+  group.add(sea);
+
   return { group, lamps: built.lamps, glows: built.glows, smoke: built.smoke,
-           fountains: built.fountains, water };
+           fountains: built.fountains, water, sea };
 }
 
 // ── prop construction: little box recipes, merged per colour ───────────────
@@ -479,6 +510,64 @@ function buildProps(props: Prop[], view: IslandView) {
         B(0, 5.25, 0, 0.9, 0.45, 0.9, C.tam);              // lantern top
         B(0, 5.75, 0, 0.1, 0.6, 0.1, C.concreteD);         // flag pole
         B(0.22, 5.9, 0, 0.38, 0.22, 0.05, C.coral);        // flag
+        break;
+      }
+      case 'irs': {
+        // The IRS headquarters: a stepped brutalist ziggurat, the tallest
+        // thing on the west side and the most boring building in the city —
+        // which, in a kawaii city, is the menace. Fat rooftop letters so you
+        // can read your doom from across town. A plinth sunk a full block
+        // below grade seats it into the terrain instead of hovering on it.
+        B(0, -0.45, 0, 6.8, 1.3, 6.6, C.concreteD);        // foundation plinth
+        B(0, 1.9, 0, 6.4, 3.8, 6.2, C.concrete);           // base tier
+        B(0, 3.88, 0, 6.7, 0.22, 6.5, C.concreteD);        // cornice
+        B(0, 5.0, -0.5, 5.0, 2.1, 4.6, C.concrete);        // mid tier
+        B(0, 6.12, -0.5, 5.3, 0.2, 4.9, C.concreteD);      // cornice
+        B(0, 7.6, -0.9, 3.9, 2.8, 3.2, C.concrete);        // the tower
+        B(0, 9.06, -0.9, 4.15, 0.24, 3.45, C.concreteD);   // parapet
+        // grim window grids, tier by tier
+        for (const row of [1.5, 2.9])
+          for (let i = -3; i <= 3; i++)
+            B(i * 0.82, row, 3.12, 0.48, 0.62, 0.06, C.glass);
+        for (let i = -2; i <= 2; i++)
+          B(i * 0.85, 5.15, 1.82, 0.46, 0.85, 0.06, C.glass);
+        for (const row of [7.35, 8.35])
+          for (let i = -1; i <= 1; i++)
+            B(i * 1.0, row, 0.72, 0.5, 0.6, 0.06, C.glass);
+        for (const sx of [-1, 1])                          // base side windows
+          for (let j = -2; j <= 2; j++)
+            B(sx * 3.22, 2.2, j * 1.1, 0.06, 0.62, 0.5, C.glass);
+        // the entrance: columned portico, tall dark doors, the seal
+        for (const cx of [-1.9, -1.0, 1.0, 1.9])
+          B(cx, 1.2, 3.9, 0.45, 2.4, 0.45, C.concrete);
+        B(0, 2.52, 3.75, 4.7, 0.35, 1.75, C.concreteD);    // portico roof
+        B(0, 0.12, 4.4, 4.2, 0.24, 1.3, C.concreteD);      // steps
+        B(0, 0.32, 3.95, 3.5, 0.2, 0.9, C.concreteD);
+        B(-0.42, 1.35, 3.14, 0.74, 2.1, 0.08, C.dark);     // double doors
+        B(0.42, 1.35, 3.14, 0.74, 2.1, 0.08, C.dark);
+        B(0.62, 1.35, 3.19, 0.09, 0.09, 0.03, C.gold);     // handles
+        B(-0.62, 1.35, 3.19, 0.09, 0.09, 0.03, C.gold);
+        B(0, 3.1, 3.16, 0.7, 0.7, 0.06, C.gold);           // the seal
+        for (const sx of [-1, 1]) {                        // flag flanks
+          B(sx * 2.9, 2.4, 3.7, 0.09, 4.8, 0.09, C.concreteD);
+          B(sx * 2.9 + 0.28, 4.55, 3.7, 0.48, 0.3, 0.05, C.coral);
+        }
+        B(0, 9.75, -0.9, 0.09, 1.2, 0.09, C.dark);         // antenna
+        B(0, 10.42, -0.9, 0.18, 0.18, 0.18, 0xff5540);     // beacon
+        // ── FAT ROOF LETTERS on the tower ──
+        const TH = 0.34, DEEP = 0.34, BASE = 9.2, LZ = 0.35 - 0.9;
+        const seg = (ox: number, lx: number, ly: number, w: number, h: number) =>
+          B(ox + lx, BASE + ly, LZ, w, h, DEEP, C.dark);
+        // I
+        seg(-1.35, 0, 1.45, 1.0, 0.3); seg(-1.35, 0, 0.8, TH, 1.0); seg(-1.35, 0, 0.15, 1.0, 0.3);
+        // R
+        seg(0, -0.33, 0.8, TH, 1.6); seg(0, 0.08, 1.45, 0.85, 0.3);
+        seg(0, 0.33, 1.1, TH, 0.55); seg(0, 0.08, 0.82, 0.85, 0.28);
+        seg(0, 0.3, 0.34, TH, 0.68);
+        // S
+        seg(1.35, 0, 1.45, 1.0, 0.3); seg(1.35, -0.33, 1.12, TH, 0.42);
+        seg(1.35, 0, 0.8, 1.0, 0.3); seg(1.35, 0.33, 0.48, TH, 0.42);
+        seg(1.35, 0, 0.15, 1.0, 0.3);
         break;
       }
       case 'transamerica': {

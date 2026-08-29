@@ -72,7 +72,7 @@ const PLACEMENTS: Placement[] = [
   { file: 'bread-cart.glb',          x: 43.8, z: 42.9, size: 1.9, rot: 0.25 },  // market
   { file: 'icecream-lamp.glb',       x: 51.6, z: 25.4, size: 2.5, rot: -0.5 },  // Gate overlook
   { file: 'snail-wheelbarrow.glb',   x: 22.4, z: 78.2, size: 1.15, rot: 1.9 },  // farm
-  // parked vehicles (the summonable fleet lives in taxi.ts)
+  // parked vehicles (the summonable fleet lives in cartly/carts.ts)
   { file: 'waymo-minivan.glb',  x: 45.6, z: 50.5, size: 2.9, rot: 0.08, fit: 'length' },  // curb on the avenue
   { file: 'bicycle.glb',        x: 61.3, z: 30.4, size: 1.6, rot: 2.3, fit: 'length' },   // Telegraph Hill path
   { file: 'vespa-scooter.glb',  x: 44.6, z: 45.5, size: 1.5, rot: -1.1, fit: 'length' },  // market curb

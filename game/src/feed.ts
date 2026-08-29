@@ -1,4 +1,5 @@
 import type { TimeState, WeatherState, WorldEvent } from '../../shared/protocol';
+import { esc } from './util';
 
 /**
  * The city pulse — press L, or tap the button stacked above the scrying
@@ -161,11 +162,6 @@ function ago(at: number): string {
   return `${Math.round(s / 3600)}h`;
 }
 
-function esc(s: string): string {
-  const d = document.createElement('div');
-  d.textContent = s;
-  return d.innerHTML;
-}
 
 function escAttr(s: string): string {
   return /^#[0-9a-fA-F]{3,8}$/.test(s) ? s : '#fffdf6';

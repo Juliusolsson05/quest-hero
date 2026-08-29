@@ -1,4 +1,5 @@
 import type { Quest, TimeState, WeatherState } from '../../shared/protocol';
+import { esc } from './util';
 
 /** HUD: weather/time chips, event toasts, the talk bar, and the quest board. */
 
@@ -22,6 +23,8 @@ export class Ui {
 
   onSay: (npcId: string, text: string) => void = () => {};
   onAccept: (questId: string) => void = () => {};
+  /** Tapping the interaction pill = pressing E (the touch path). */
+  onPromptTap: () => void = () => {};
 
   constructor() {
     document.body.insertAdjacentHTML('beforeend', `
@@ -59,6 +62,7 @@ export class Ui {
       }
     });
     this.questPanel.querySelector('.q-close')!.addEventListener('click', () => this.closeQuests());
+    this.prompt.addEventListener('click', () => this.onPromptTap());
 
     // Clicking anywhere outside a panel dismisses it — no hunting for ✕ / Esc.
     document.addEventListener('pointerdown', (e) => {
@@ -154,8 +158,3 @@ export class Ui {
   }
 }
 
-function esc(s: string): string {
-  const d = document.createElement('div');
-  d.textContent = s;
-  return d.innerHTML;
-}

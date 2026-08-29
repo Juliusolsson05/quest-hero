@@ -8,6 +8,7 @@ import {
 } from 'playroomkit';
 import { CharacterView } from './chars';
 import type { AnimName } from '../../shared/protocol';
+import { angleToward } from './util';
 
 /**
  * Multiplayer, ported from worldplay4's net stack (src/lib/net/playroom.ts):
@@ -86,13 +87,15 @@ export class Multiplayer {
   count(): number { return this.remotes.size + (this.ready ? 1 : 0); }
 
   async join(): Promise<void> {
-    // Room code from the link, else mint one and write it into the address bar
-    // — whatever is in the bar is the invite.
+    // Room code from the link, else the shared city room — the hosted site is
+    // ONE city, so two people who just open the bare URL meet by default
+    // (minting a random code here put every visitor in their own empty room).
+    // An explicit ?room=CODE still carves out a private city, and whatever is
+    // in the address bar is the invite.
     const params = new URLSearchParams(location.search);
     let room = params.get('room')?.toUpperCase() ?? null;
     if (!room || !/^[A-Z0-9]{4,10}$/.test(room)) {
-      const alpha = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-      room = Array.from({ length: 6 }, () => alpha[Math.floor(Math.random() * alpha.length)]).join('');
+      room = 'SFQUEST';
       params.set('room', room);
       history.replaceState(null, '', `${location.pathname}?${params.toString()}`);
     }
@@ -168,10 +171,7 @@ export class Multiplayer {
       r.rot = pose.rot;
       r.view.setAnim(pose.anim === 'idle' || pose.anim === 'walk' || pose.anim === 'run' ? pose.anim : 'idle');
       r.view.root.position.lerp(r.target, k);
-      let d = r.rot - r.view.root.rotation.y;
-      while (d > Math.PI) d -= Math.PI * 2;
-      while (d < -Math.PI) d += Math.PI * 2;
-      r.view.root.rotation.y += d * k;
+      r.view.root.rotation.y = angleToward(r.view.root.rotation.y, r.rot, k);
       r.view.update(dt);
     }
   }

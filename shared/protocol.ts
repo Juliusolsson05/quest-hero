@@ -124,6 +124,8 @@ export type PropKind =
   // San Francisco — recognizable landmarks + city fabric, kawaii-voxel scale
   | 'goldengate' | 'transamerica' | 'salesforce' | 'paintedladies'
   | 'coit' | 'sutro' | 'cablecar'
+  // civic menace
+  | 'irs'
   | 'sfhouse' | 'shop' | 'tower' | 'ferry';
 export interface Prop { kind: PropKind; pos: Vec3; rot?: number; scale?: number }
 

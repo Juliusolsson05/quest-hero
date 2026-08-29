@@ -6,6 +6,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
+    "tunnel": "cloudflared tunnel --url http://localhost:7777 --no-autoupdate",
     "deploy": "npm run build && cd dist && vercel link --yes --project sf-quest --scope gustifinks-projects && vercel deploy --prod --yes"
   },
   "dependencies": {

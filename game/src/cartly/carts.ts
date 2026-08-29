@@ -1,7 +1,8 @@
 import * as THREE from 'three';
-import type { IslandView } from './world';
-import type { Player } from './player';
-import { propTemplate } from './props3d';
+import type { IslandView } from '../world';
+import type { Player } from '../player';
+import { propTemplate } from '../props3d';
+import { angleToward } from '../util';
 
 /**
  * The Cartly fleet. A summoned cart spawns at the Marin vista point, rolls
@@ -187,6 +188,7 @@ export class CartService {
     const streets = this.streets()!;
     this.phase = 'riding';
     this.player.view.root.visible = false;
+    this.player.controlled = false;     // the cart owns the hero's pose now
     document.body.dataset.typing = '1'; // freeze WASD while riding
     const here: [number, number] = [Math.floor(this.mesh.position.x), Math.floor(this.mesh.position.z)];
     // Destination: a chosen rendezvous (an NPC picked on the phone) wins;
@@ -253,11 +255,7 @@ export class CartService {
     m.position.z += flat.z * SPEED * dt;
     m.position.y = this.carY + Math.abs(Math.sin(this.bobT * 9)) * 0.035;
 
-    const yaw = Math.atan2(flat.x, flat.z);
-    let d = yaw - m.rotation.y;
-    while (d > Math.PI) d -= Math.PI * 2;
-    while (d < -Math.PI) d += Math.PI * 2;
-    m.rotation.y += d * Math.min(1, dt * 6);
+    m.rotation.y = angleToward(m.rotation.y, Math.atan2(flat.x, flat.z), dt * 6);
 
     if (this.phase === 'arriving') {
       let remaining = dist;
@@ -276,6 +274,7 @@ export class CartService {
     const island = this.island();
     const m = this.mesh!;
     this.player.view.root.visible = true;
+    this.player.controlled = true;
     delete document.body.dataset.typing;
     // Step out beside the cart — prefer the sidewalk over the roadway.
     let out: THREE.Vector3 | null = null;

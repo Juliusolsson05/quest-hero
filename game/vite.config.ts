@@ -2,6 +2,10 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
   server: {
+    /** Bind on all interfaces so the invite link works across the venue wifi:
+     *  share the "Network" URL vite prints (http://<LAN-IP>:PORT/?room=CODE) —
+     *  a localhost link only ever points at the opener's own machine. */
+    host: true,
     /**
      * TrueForge serves no CORS headers, so a direct browser fetch from
      * :5173 to :8790 is blocked before it leaves the page — it surfaces as

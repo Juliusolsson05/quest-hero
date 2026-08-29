@@ -2,15 +2,15 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <title>SF Quest</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&display=swap" />
     <style>
-      * { margin: 0; padding: 0; box-sizing: border-box; }
+      * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
       body { overflow: hidden; background: #bfe6f7; color: #35313f;
              font: 15px/1.5 "Baloo 2", "Trebuchet MS", system-ui, sans-serif; }
-      canvas { display: block; }
+      canvas { display: block; touch-action: none; }
       kbd { background: #35313f; color: #fffdf6; border-radius: 6px; padding: 1px 7px; font: inherit; }
 
       /* HUD chips */
@@ -35,12 +35,13 @@
       .toast.out { opacity: 0; transform: translateX(20px); }
       @keyframes t-in { from { transform: translateY(-12px) scale(.9); opacity: 0; } }
 
-      /* interact prompt */
+      /* interact prompt — tapping it is the same as pressing E */
       #prompt { position: fixed; left: 50%; bottom: 15%; transform: translateX(-50%);
                 background: rgba(255,253,246,.95); border: 2px solid #35313f; border-radius: 999px;
                 padding: 7px 16px; font-weight: 700; opacity: 0; transition: opacity .15s;
                 pointer-events: none; z-index: 15; box-shadow: 0 4px 0 rgba(53,49,63,.14); }
-      #prompt.on { opacity: 1; }
+      #prompt.on { opacity: 1; pointer-events: auto; cursor: pointer; }
+      #prompt:active { transform: translateX(-50%) translateY(2px); box-shadow: none; }
 
       /* talk bar */
       #talkbar { position: fixed; left: 50%; bottom: 4.5vh; transform: translateX(-50%) translateY(20px);
@@ -210,6 +211,33 @@
         #phone, .ph-eta-icon svg, .ph-map-cart svg, .ph-map-cart { transition: none; animation: none; }
       }
 
+      /* ── touch chrome (body.touch is set by src/touch.ts on coarse pointers) ──
+         left thumb: joystick · right thumb: phone + pulse buttons ·
+         minimap tucked top-right so nothing sits over a control */
+      #joy { display: none; }
+      body.touch #joy { display: block; position: fixed; left: 18px; bottom: 18px; width: 132px; height: 132px;
+                        z-index: 28; border: 2.5px solid #35313f; border-radius: 999px;
+                        background: rgba(255,253,246,.55); box-shadow: 0 4px 0 rgba(53,49,63,.14);
+                        touch-action: none; backdrop-filter: blur(2px); }
+      body.touch .joy-knob { position: absolute; left: 50%; top: 50%; width: 58px; height: 58px;
+                             margin: -29px 0 0 -29px; border: 2.5px solid #35313f; border-radius: 999px;
+                             background: #a8e6cf; box-shadow: 0 3px 0 rgba(53,49,63,.2);
+                             pointer-events: none; transition: transform .06s linear; }
+      body.touch #minimap { width: 108px; height: 108px; left: auto; right: 12px; top: 60px; bottom: auto;
+                            border-radius: 12px; border-width: 2px; opacity: .96; }
+      body.touch .pb-key { display: none; }
+      body.touch #prompt kbd { display: none; }
+      body.touch #prompt { bottom: 22%; padding: 10px 20px; font-size: 16px; }
+      body.touch #hud { gap: 6px; max-width: calc(100vw - 146px); } /* clears the minimap */
+      body.touch .chip { font-size: 11.5px; padding: 2px 10px; }
+      body.touch #toasts { top: 176px; right: 12px; max-width: 58vw; }
+      body.touch .toast { font-size: 12px; padding: 6px 11px; }
+      body.touch #questpanel { left: 12px; right: 12px; width: auto; top: 60px; max-height: 62vh; }
+      body.touch #feedpanel { left: 12px; right: 12px; width: auto; bottom: 88px; max-height: 54vh; }
+      body.touch #phone { width: min(288px, calc(100vw - 24px)); }
+      body.touch .ph-screen { height: min(592px, 68vh); }
+      body.touch #talkbar { bottom: 2.5vh; }
+
       /* start overlay */
       #start { position: fixed; inset: 0; display: grid; place-content: center; gap: 12px; text-align: center;
                background: linear-gradient(180deg, #bfe6f7 0%, #ffe9d2 78%, #ffd9d5 100%); cursor: pointer; z-index: 40; }
@@ -220,6 +248,12 @@
       #start .go { margin-top: 8px; font-weight: 800; color: #e2574f; animation: pulse 1.6s infinite; }
       #start.hidden { display: none; }
       @keyframes pulse { 50% { opacity: .5; } }
+      @media (max-width: 480px) {
+        #start { padding: 0 18px; }
+        #start h1 { font-size: 40px; }
+        #start .sub { font-size: 14px; }
+        #start .keys { font-size: 12.5px; }
+      }
     </style>
   </head>
   <body>

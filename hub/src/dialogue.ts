@@ -38,7 +38,13 @@ import {
 import { clamp, dist2d, nextId, pick, warnOnce } from './util';
 
 const BASE = CONFIG.trueforgeBase;
-const STALL_MS = 10_000;
+/** No bytes at all from the harness for this long → the stream is dead. Wide
+ *  because a server-side tool run (tavily search, scrape) is silent on the
+ *  wire until its tool.response lands. */
+const STALL_MS = 45_000;
+/** Hard ceiling per player turn, activity or not — an agent that is still
+ *  happily searching two minutes in has lost the player anyway. */
+const TURN_CAP_MS = 120_000;
 
 class HarnessUnavailable extends Error {}
 
@@ -163,6 +169,9 @@ export interface TurnCallbacks {
   onDelta: (chunk: string) => void;
   /** one badge per real tool call: name or "tool: query…" once args parse */
   onTool?: (label: string) => void;
+  /** fires on every chunk off the wire — reasoning deltas, system tool calls,
+   *  keep-alives — so a stall watchdog measures a dead stream, not a quiet one */
+  onActivity?: () => void;
 }
 
 function toolDetail(c: ToolCallAcc): string | null {
@@ -246,6 +255,7 @@ export async function streamTurn(sessionId: string, content: string, cb: TurnCal
   const decoder = new TextDecoder();
   let buffer = '';
   for await (const chunk of res.body) {
+    cb.onActivity?.();
     buffer += decoder.decode(chunk as Uint8Array, { stream: true });
     const frames = buffer.split('\n\n');
     buffer = frames.pop() ?? '';
@@ -370,6 +380,7 @@ async function runTurn(npc: Npc, seed: NpcSeed, convId: string, text: string, fr
   let lastEmit = 0;
   const ctrl = new AbortController();
   let watchdog = setTimeout(() => ctrl.abort(), STALL_MS);
+  const cap = setTimeout(() => ctrl.abort(), TURN_CAP_MS);
   const bump = () => {
     clearTimeout(watchdog);
     watchdog = setTimeout(() => ctrl.abort(), STALL_MS);
@@ -381,9 +392,9 @@ async function runTurn(npc: Npc, seed: NpcSeed, convId: string, text: string, fr
       sid,
       digest,
       {
+        onActivity: bump,
         onDelta: (chunk) => {
           acc += chunk;
-          bump();
           if (/^\s*\[[a-z]*$/i.test(acc)) return; // partial leading emotion tag — hold
           const p = parseEmotion(acc);
           const now = Date.now();
@@ -393,22 +404,29 @@ async function runTurn(npc: Npc, seed: NpcSeed, convId: string, text: string, fr
           }
         },
         onTool: (label) => {
-          bump();
           broadcast({ t: 'bubble', who: npc.id, convId, text: label, emotion: 'think', mode: 'tool' });
         },
       },
       ctrl.signal,
     );
-    clearTimeout(watchdog);
     const p = parseEmotion(acc);
     const final = p.text.trim();
     if (!final) throw new HarnessUnavailable('empty reply');
     finishTurn(npc, convId, final, p.emotion);
   } catch (e) {
-    clearTimeout(watchdog);
+    // A stream that dies mid-answer still said something — a truncated real
+    // reply beats a canned line that ignores the question.
+    const p = parseEmotion(acc);
+    if (p.text.trim()) {
+      finishTurn(npc, convId, p.text.trim(), p.emotion);
+      return;
+    }
     const why = e instanceof Error ? e.message : String(e);
     warnOnce('trueforge-down', `[dialogue] TrueForge fallback path (${why}) — canned lines until it recovers`);
     finishTurn(npc, convId, pick(seed.fallbacks), 'think');
+  } finally {
+    clearTimeout(watchdog);
+    clearTimeout(cap);
   }
 }
 
@@ -503,7 +521,7 @@ function templateQuest(headline: string, url: string): Quest {
 async function scribeTurn(sid: string, content: string, url: string): Promise<Quest | null> {
   let acc = '';
   const ctrl = new AbortController();
-  let wd = setTimeout(() => ctrl.abort(), 12_000);
+  let wd = setTimeout(() => ctrl.abort(), 20_000);
   try {
     await streamTurn(
       sid,
@@ -511,8 +529,10 @@ async function scribeTurn(sid: string, content: string, url: string): Promise<Qu
       {
         onDelta: (c) => {
           acc += c;
+        },
+        onActivity: () => {
           clearTimeout(wd);
-          wd = setTimeout(() => ctrl.abort(), 12_000);
+          wd = setTimeout(() => ctrl.abort(), 20_000);
         },
       },
       ctrl.signal,

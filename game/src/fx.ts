@@ -70,7 +70,8 @@ export class Atmosphere {
 
     this.sun = new THREE.DirectionalLight(0xfff2d8, 3);
     this.sun.castShadow = true;
-    this.sun.shadow.mapSize.set(4096, 4096);
+    const shadowRes = matchMedia('(pointer: coarse)').matches ? 2048 : 4096; // phones
+    this.sun.shadow.mapSize.set(shadowRes, shadowRes);
     const cam = this.sun.shadow.camera;
     cam.left = -58; cam.right = 58; cam.top = 58; cam.bottom = -58; cam.far = 260;
     this.sun.shadow.bias = -0.0004;

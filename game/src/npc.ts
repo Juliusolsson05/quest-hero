@@ -18,10 +18,19 @@ export interface NpcDef {
    * if this id is not available.
    */
   model: string;
-  /** Names of MCP servers from Settings -> Connectors, per character. Bran has
-   *  no business searching the web, and withholding the tool is more reliable
-   *  than instructing him not to use it. */
-  mcpServers?: string[];
+  /**
+   * Whether this character can reach outside the game world.
+   *
+   * A capability, not a list of server names: which providers are configured
+   * is a property of the machine, not of the character. Wren wants "the web";
+   * whether that resolves to Tavily, Bright Data, or both is decided at
+   * runtime from what the harness actually has connected. Adding a provider
+   * in Settings therefore needs no code change here.
+   *
+   * Bran has no business searching the web, and withholding the tool is more
+   * reliable than instructing him not to use it.
+   */
+  webAccess?: boolean;
 }
 
 export const NPCS: NpcDef[] = [
@@ -51,7 +60,7 @@ export const NPCS: NpcDef[] = [
     position: [-4, 4],
     color: 0x6aa9d0,
     model: 'openai/gpt-5-5',
-    mcpServers: ['tavily'],
+    webAccess: true,
     persona:
       'You are Wren, herald of Ashford, who trades in news. You are curious about ' +
       'the world beyond the town and you have tools that reach it. When a traveller ' +

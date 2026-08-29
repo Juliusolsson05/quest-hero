@@ -4,7 +4,7 @@
  * (zero LLM cost — canned pools + tiny scenes every 60-90s).
  */
 import type { Animal, Npc, TimePhase, Vec3 } from '../../shared/protocol';
-import { canStep, heightAt, poi, POI_LABELS, randomWalkableNear } from './island';
+import { canStep, findPath, heightAt, isRoad, poi, POI_LABELS, randomWalkableNear } from './island';
 import { NPC_SEEDS, type NpcSeed, type RoutineStop } from './npcs';
 import {
   addEvent,
@@ -22,21 +22,11 @@ import {
 import { dist2d, pick, rand, round2 } from './util';
 
 const TICK_MS = 100;
-const NPC_SPEED = 1.6; // m/s
+const NPC_SPEED = 2.1; // m/s — the city is big now, villagers hustle a little
 const STROLL_SPEED = 0.9; // m/s — casual shuffle while lingering at a stop
 const NPC_MIN_GAP = 1.0; // m — closer than this reads as "standing inside each other"
 const SPOT_GAP = 1.6; // m — min spacing between chosen standing spots
 const STOP_RADIUS = 2.8; // m — how widely a routine stop fans out around its POI
-
-// The Cartly cab parks along (24, 28)→(24, 31) (client-side theatre, see
-// game/src/taxi.ts). Standing spots keep out of this capsule so the pickup
-// reads clean on camera; NPCs may still walk through it.
-const PICKUP_LANE = { x: 24, z0: 28, z1: 31, r: 2.5 };
-
-function inPickupLane(x: number, z: number): boolean {
-  const z2 = Math.max(PICKUP_LANE.z0, Math.min(PICKUP_LANE.z1, z));
-  return dist2d(x, z, PICKUP_LANE.x, z2) < PICKUP_LANE.r;
-}
 
 // ── NPC runtime ─────────────────────────────────────────────────────────────
 
@@ -46,6 +36,12 @@ interface NpcRt {
   phase: TimePhase;
   stop: RoutineStop | null;
   target: Vec3 | null;
+  /** nav-grid waypoints toward `target` (last entry = the exact target) */
+  path: Vec3[];
+  /** seconds spent barely moving while en route — the anti-jiggle watchdog */
+  stuckT: number;
+  /** one re-path already spent on the current leg */
+  repathed: boolean;
   dwellUntil: number;
   /** POI forced via POST /api/npcs/:id/goto — overrides the routine once */
   forced: string | null;
@@ -55,6 +51,21 @@ interface NpcRt {
   parkedUntil: number;
   /** next time the idle-life roll fires (stroll / glance / funny fidget) */
   nextIdleAt: number;
+}
+
+/** Route rt toward dest along the nav grid (straight steering as fallback). */
+function routeTo(rt: NpcRt, dest: Vec3): void {
+  rt.target = dest;
+  rt.path = findPath(rt.npc.pos, dest) ?? [dest];
+  rt.stuckT = 0;
+  rt.repathed = false;
+}
+
+function clearWalk(rt: NpcRt): void {
+  rt.target = null;
+  rt.path = [];
+  rt.stuckT = 0;
+  rt.repathed = false;
 }
 
 const npcRts: NpcRt[] = [];
@@ -82,9 +93,10 @@ function pickSpotNear(rt: NpcRt, x: number, z: number, radius: number): Vec3 {
     const c = randomWalkableNear(x, z, radius);
     let nearest = Infinity;
     for (const s of others) nearest = Math.min(nearest, dist2d(c.x, c.z, s.x, s.z));
-    // Lane spots never win over any clean sample, but stay pickable as the
-    // last resort so a POI inside the lane can't strand its routine.
-    if (inPickupLane(c.x, c.z)) nearest -= 100;
+    // Nobody idles in the middle of a street: road spots never win over any
+    // clean sample, but stay pickable as the last resort so a POI hemmed in
+    // by asphalt can't strand its routine. (Walking across roads is fine.)
+    if (isRoad(c.x, c.z)) nearest -= 100;
     else if (nearest >= SPOT_GAP) return c;
     if (nearest > bestScore) {
       bestScore = nearest;
@@ -129,7 +141,9 @@ function stepToward(e: { pos: Vec3; rot: number }, target: Vec3, speed: number, 
   }
   const step = Math.min(speed * dt, d);
   const base = Math.atan2(dx, dz);
-  for (const off of [0, 0.55, -0.55, 1.1, -1.1, 1.7, -1.7, Math.PI]) {
+  // No backwards fallback: stepping back one tick and forward the next reads
+  // as jiggling. Boxed in = hold still; callers watch for that and re-path.
+  for (const off of [0, 0.55, -0.55, 1.1, -1.1, 1.7, -1.7]) {
     const a = base + off;
     const nx = e.pos.x + Math.sin(a) * step;
     const nz = e.pos.z + Math.cos(a) * step;
@@ -181,17 +195,20 @@ function tickNpc(rt: NpcRt, now: number, dt: number, phase: TimePhase): void {
   if (phase !== rt.phase && !rt.forced) {
     rt.phase = phase;
     rt.stop = null;
-    rt.target = null;
+    clearWalk(rt);
     rt.stroll = null;
     rt.dwellUntil = 0; // phase change: pick a fresh stop right away
   }
 
   if (rt.target) {
     npc.anim = 'walk';
-    if (stepToward(npc, rt.target, NPC_SPEED, dt)) {
-      rt.target = null;
+    const px = npc.pos.x, pz = npc.pos.z;
+    const wp = rt.path[0] ?? rt.target;
+    if (stepToward(npc, wp, NPC_SPEED, dt)) {
+      if (rt.path.length > 1) { rt.path.shift(); return; } // next corner
+      clearWalk(rt);
       rt.stroll = null;
-      rt.dwellUntil = now + rand(20_000, 60_000);
+      rt.dwellUntil = now + rand(12_000, 35_000);
       rt.nextIdleAt = now + rand(5_000, 12_000);
       npc.anim = 'idle';
       if (rt.forced) {
@@ -201,6 +218,23 @@ function tickNpc(rt: NpcRt, now: number, dt: number, phase: TimePhase): void {
       } else if (rt.stop) {
         setActivity(npc, rt.stop.activity);
       }
+      return;
+    }
+    // Anti-jiggle watchdog: barely moving while en route means we're wedged
+    // (a crowd, a wall the steering can't slide around). Re-path once around
+    // it; if that doesn't free us, drop the walk and let the routine retry.
+    if (dist2d(px, pz, npc.pos.x, npc.pos.z) < NPC_SPEED * dt * 0.25) {
+      rt.stuckT += dt;
+      if (rt.stuckT > 1.5 && !rt.repathed) {
+        rt.repathed = true;
+        rt.path = findPath(npc.pos, rt.target) ?? [rt.target];
+      } else if (rt.stuckT > 4) {
+        clearWalk(rt);
+        npc.anim = 'idle';
+        rt.dwellUntil = now + rand(3_000, 8_000);
+      }
+    } else {
+      rt.stuckT = 0;
     }
     return;
   }
@@ -214,9 +248,16 @@ function tickNpc(rt: NpcRt, now: number, dt: number, phase: TimePhase): void {
   // mid-dwell shuffle: amble a few steps without touching the routine
   if (rt.stroll) {
     npc.anim = 'walk';
+    const px = npc.pos.x, pz = npc.pos.z;
     if (stepToward(npc, rt.stroll, STROLL_SPEED, dt)) {
       rt.stroll = null;
       npc.anim = 'idle';
+      rt.stuckT = 0;
+    } else if (dist2d(px, pz, npc.pos.x, npc.pos.z) < STROLL_SPEED * dt * 0.25) {
+      rt.stuckT += dt;
+      if (rt.stuckT > 1.2) { rt.stroll = null; npc.anim = 'idle'; rt.stuckT = 0; }
+    } else {
+      rt.stuckT = 0;
     }
     return;
   }
@@ -231,8 +272,8 @@ function tickNpc(rt: NpcRt, now: number, dt: number, phase: TimePhase): void {
   rt.stop = stop;
   const p = poi(stop.poi);
   if (!p) return;
-  rt.target = pickSpotNear(rt, p.pos.x, p.pos.z, STOP_RADIUS);
-  if (dist2d(npc.pos.x, npc.pos.z, rt.target.x, rt.target.z) > 2) {
+  routeTo(rt, pickSpotNear(rt, p.pos.x, p.pos.z, STOP_RADIUS));
+  if (dist2d(npc.pos.x, npc.pos.z, rt.target!.x, rt.target!.z) > 2) {
     setActivity(npc, `walking to ${POI_LABELS[stop.poi] ?? stop.poi}`);
   }
 }
@@ -246,7 +287,7 @@ export function sendNpcTo(npcId: string, poiId: string): Npc | undefined {
   rt.stop = null;
   rt.stroll = null;
   rt.parkedUntil = 0;
-  rt.target = pickSpotNear(rt, p.pos.x, p.pos.z, 1.8);
+  routeTo(rt, pickSpotNear(rt, p.pos.x, p.pos.z, 1.8));
   rt.dwellUntil = 0;
   setActivity(rt.npc, `walking to ${POI_LABELS[poiId] ?? poiId}`);
   return rt.npc;
@@ -268,7 +309,7 @@ export function summonForChat(aId: string, bId: string): boolean {
   const ra = npcRts.find((r) => r.npc.id === aId);
   const rb = npcRts.find((r) => r.npc.id === bId);
   if (!ra || !rb) return false;
-  rb.target = null;
+  clearWalk(rb);
   rb.stroll = null;
   rb.forced = null;
   rb.parkedUntil = Date.now() + 40_000; // long enough for the walk over
@@ -278,7 +319,7 @@ export function summonForChat(aId: string, bId: string): boolean {
   ra.stroll = null;
   ra.parkedUntil = 0;
   ra.dwellUntil = 0;
-  ra.target = chatSpotNear(rb.npc.pos);
+  routeTo(ra, chatSpotNear(rb.npc.pos));
   setActivity(ra.npc, `heading over to ${rb.npc.name}`);
   return true;
 }
@@ -290,7 +331,7 @@ export function holdFacing(aId: string, bId: string, holdMs: number): void {
   if (!ra || !rb) return;
   const until = Date.now() + holdMs;
   for (const [me, other] of [[ra, rb], [rb, ra]] as const) {
-    me.target = null;
+    clearWalk(me);
     me.stroll = null;
     me.forced = null;
     me.parkedUntil = until;
@@ -521,6 +562,9 @@ export function startSim(): void {
       phase: getTime().phase,
       stop: null,
       target: null,
+      path: [],
+      stuckT: 0,
+      repathed: false,
       dwellUntil: 0,
       forced: null,
       stroll: null,

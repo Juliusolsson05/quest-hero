@@ -59,10 +59,19 @@ export class Ui {
       }
     });
     this.questPanel.querySelector('.q-close')!.addEventListener('click', () => this.closeQuests());
+
+    // Clicking anywhere outside a panel dismisses it — no hunting for ✕ / Esc.
+    document.addEventListener('pointerdown', (e) => {
+      const t = e.target as Node;
+      if (this.talkTarget && !this.talk.contains(t)) this.closeTalk();
+      if (this.questsOpen && !this.questPanel.contains(t)) this.closeQuests();
+    });
   }
 
-  setLink(ok: boolean): void {
-    this.linkChip.textContent = ok ? '🟢 hub' : '⚪ waking the village…';
+  setLink(ok: boolean, lonely = false): void {
+    // `lonely` = we've waited long enough that no hub is coming (static-host
+    // demo): the city runs, citizens sleep, multiplayer still works.
+    this.linkChip.textContent = ok ? '🟢 hub' : lonely ? '🌁 solo city — citizens asleep' : '⚪ waking the city…';
     this.linkChip.classList.toggle('dim', !ok);
   }
   setWeather(w: WeatherState): void {

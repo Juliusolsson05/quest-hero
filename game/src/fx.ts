@@ -15,15 +15,15 @@ interface SkyStop {
 }
 // 24h colour script. Values were eyeballed for "storybook pastel".
 const STOPS: SkyStop[] = [
-  { h: 0.0, sky: 0x141b33, horizon: 0x2a3352, sun: 0x9db4ff, sunInt: 0.22, hemiInt: 0.38, fogFar: 95 },
-  { h: 5.0, sky: 0x1b2340, horizon: 0x3d3a5e, sun: 0xa8b8ff, sunInt: 0.25, hemiInt: 0.42, fogFar: 100 },
-  { h: 6.8, sky: 0x8fb4e8, horizon: 0xffc9a8, sun: 0xffb27a, sunInt: 1.9, hemiInt: 0.85, fogFar: 130 },
-  { h: 9.0, sky: 0x9fd4f5, horizon: 0xd9ecf5, sun: 0xfff2d8, sunInt: 3.1, hemiInt: 1.05, fogFar: 170 },
-  { h: 15.5, sky: 0x9fd4f5, horizon: 0xd9ecf5, sun: 0xfff2d8, sunInt: 3.0, hemiInt: 1.05, fogFar: 170 },
-  { h: 18.6, sky: 0x7fa3e0, horizon: 0xffb88a, sun: 0xff9d5c, sunInt: 2.0, hemiInt: 0.8, fogFar: 140 },
-  { h: 20.3, sky: 0x2c3054, horizon: 0xd97a8a, sun: 0xff8a7a, sunInt: 0.7, hemiInt: 0.5, fogFar: 110 },
-  { h: 21.5, sky: 0x141b33, horizon: 0x2a3352, sun: 0x9db4ff, sunInt: 0.22, hemiInt: 0.38, fogFar: 95 },
-  { h: 24.0, sky: 0x141b33, horizon: 0x2a3352, sun: 0x9db4ff, sunInt: 0.22, hemiInt: 0.38, fogFar: 95 },
+  { h: 0.0, sky: 0x141b33, horizon: 0x2a3352, sun: 0x9db4ff, sunInt: 0.22, hemiInt: 0.38, fogFar: 175 },
+  { h: 5.0, sky: 0x1b2340, horizon: 0x3d3a5e, sun: 0xa8b8ff, sunInt: 0.25, hemiInt: 0.42, fogFar: 185 },
+  { h: 6.8, sky: 0x8fb4e8, horizon: 0xffc9a8, sun: 0xffb27a, sunInt: 1.9, hemiInt: 0.85, fogFar: 240 },
+  { h: 9.0, sky: 0x9fd4f5, horizon: 0xd9ecf5, sun: 0xfff2d8, sunInt: 3.1, hemiInt: 1.05, fogFar: 310 },
+  { h: 15.5, sky: 0x9fd4f5, horizon: 0xd9ecf5, sun: 0xfff2d8, sunInt: 3.0, hemiInt: 1.05, fogFar: 310 },
+  { h: 18.6, sky: 0x7fa3e0, horizon: 0xffb88a, sun: 0xff9d5c, sunInt: 2.0, hemiInt: 0.8, fogFar: 260 },
+  { h: 20.3, sky: 0x2c3054, horizon: 0xd97a8a, sun: 0xff8a7a, sunInt: 0.7, hemiInt: 0.5, fogFar: 200 },
+  { h: 21.5, sky: 0x141b33, horizon: 0x2a3352, sun: 0x9db4ff, sunInt: 0.22, hemiInt: 0.38, fogFar: 175 },
+  { h: 24.0, sky: 0x141b33, horizon: 0x2a3352, sun: 0x9db4ff, sunInt: 0.22, hemiInt: 0.38, fogFar: 175 },
 ];
 
 const WEATHER_MOD: Record<WeatherKind, { sun: number; grey: number; fogFar: number }> = {
@@ -35,7 +35,7 @@ const WEATHER_MOD: Record<WeatherKind, { sun: number; grey: number; fogFar: numb
   storm: { sun: 0.25, grey: 0.75, fogFar: 0.5 },
 };
 
-const CENTER = new THREE.Vector3(24, 2, 24);
+const CENTER = new THREE.Vector3(48, 2, 50);
 
 export class Atmosphere {
   private readonly hemi: THREE.HemisphereLight;
@@ -70,9 +70,9 @@ export class Atmosphere {
 
     this.sun = new THREE.DirectionalLight(0xfff2d8, 3);
     this.sun.castShadow = true;
-    this.sun.shadow.mapSize.set(2048, 2048);
+    this.sun.shadow.mapSize.set(4096, 4096);
     const cam = this.sun.shadow.camera;
-    cam.left = -34; cam.right = 34; cam.top = 34; cam.bottom = -34; cam.far = 160;
+    cam.left = -58; cam.right = 58; cam.top = 58; cam.bottom = -58; cam.far = 260;
     this.sun.shadow.bias = -0.0004;
     this.sun.shadow.normalBias = 0.03;
     this.sun.target.position.copy(CENTER);
@@ -80,7 +80,7 @@ export class Atmosphere {
 
     this.skyUniforms = { top: { value: new THREE.Color(0x9fd4f5) }, bottom: { value: new THREE.Color(0xd9ecf5) } };
     this.skyDome = new THREE.Mesh(
-      new THREE.SphereGeometry(190, 24, 16),
+      new THREE.SphereGeometry(340, 24, 16),
       new THREE.ShaderMaterial({
         side: THREE.BackSide, depthWrite: false, fog: false,
         uniforms: this.skyUniforms as unknown as Record<string, THREE.IUniform>,
@@ -98,7 +98,7 @@ export class Atmosphere {
     const sp: number[] = [];
     for (let i = 0; i < 320; i++) {
       const a = Math.random() * Math.PI * 2, e = 0.15 + Math.random() * 1.3;
-      const r = 175;
+      const r = 315;
       sp.push(CENTER.x + Math.cos(a) * Math.cos(e) * r, Math.sin(e) * r, CENTER.z + Math.sin(a) * Math.cos(e) * r);
     }
     starGeo.setAttribute('position', new THREE.Float32BufferAttribute(sp, 3));
@@ -108,7 +108,7 @@ export class Atmosphere {
     (this.stars.material as THREE.PointsMaterial).size = 1.6;
     scene.add(this.stars);
 
-    scene.fog = new THREE.Fog(0xd9ecf5, 24, 170);
+    scene.fog = new THREE.Fog(0xd9ecf5, 30, 310);
     this.buildPrecip();
   }
 
@@ -260,7 +260,7 @@ export class Atmosphere {
     const dir = night
       ? new THREE.Vector3(0.35, 0.75, -0.4)
       : new THREE.Vector3(az * 0.9, Math.max(0.08, elev), 0.35 - dayT * 0.2);
-    this.sun.position.copy(CENTER).addScaledVector(dir.normalize(), 70);
+    this.sun.position.copy(CENTER).addScaledVector(dir.normalize(), 120);
     this.sun.color.set(s.sun);
     this.sun.intensity = s.sunInt * THREE.MathUtils.lerp(1, mod.sun, this.weatherBlend);
     this.hemi.intensity = s.hemiInt * THREE.MathUtils.lerp(1, (mod.sun + 1) / 2, this.weatherBlend);

@@ -121,20 +121,24 @@ export type PropKind =
   | 'tree' | 'pine' | 'lamp' | 'fence' | 'stall' | 'fountain' | 'board'
   | 'forge' | 'anvil' | 'house' | 'mailbox' | 'pen' | 'boat' | 'rock'
   | 'flowerpatch' | 'shrine' | 'well'
-  // Little San Francisco — recognizable landmarks, kawaii-voxel scale
+  // San Francisco — recognizable landmarks + city fabric, kawaii-voxel scale
   | 'goldengate' | 'transamerica' | 'salesforce' | 'paintedladies'
-  | 'coit' | 'sutro' | 'cablecar';
+  | 'coit' | 'sutro' | 'cablecar'
+  | 'sfhouse' | 'shop' | 'tower' | 'ferry';
 export interface Prop { kind: PropKind; pos: Vec3; rot?: number; scale?: number }
 
 /** Static island description sent once in the welcome frame. */
 export interface Island {
   size: number; // tiles per side
-  /** rows of tile chars: ~ water, . grass, , dirt, : path, # plaza, s sand */
+  /** rows of tile chars: ~ water, . grass, , dirt, : path, # plaza/sidewalk,
+   *  s sand, r street asphalt, b bridge deck (walkable, water rendered below) */
   tiles: string[];
   /** column heights aligned with tiles, '0'-'9' per char */
   heights: string[];
   pois: { id: string; label: string; pos: Vec3 }[];
   props: Prop[];
+  /** circle colliders around solid props — nobody walks through a house */
+  blockers: { x: number; z: number; r: number }[];
 }
 
 // ── WebSocket frames ────────────────────────────────────────────────────────

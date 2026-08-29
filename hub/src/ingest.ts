@@ -162,10 +162,19 @@ export function resumeRealTime(): TimeState {
 
 // ── Hacker News → Quest Scribe ──────────────────────────────────────────────
 
-let lastTopStory: number | null = null;
+const seenStories = new Set<number>();
+let lastHeadlineAt = 0;
 
-function hasLiveHeadlineQuest(): boolean {
-  return listQuests().some((q) => q.source.type === 'headline' && q.state !== 'done');
+/**
+ * One fresh rumor every 15 minutes. The old rule was "≤1 live headline quest",
+ * which quietly ended the news forever: nobody completes a quest during a demo,
+ * so the first rumor pinned the board and no headline ever landed again. A
+ * cooldown keeps word arriving from the far roads while the board stays short.
+ */
+const HEADLINE_COOLDOWN_MS = 15 * 60_000;
+
+function headlineCooling(): boolean {
+  return Date.now() - lastHeadlineAt < HEADLINE_COOLDOWN_MS;
 }
 
 async function pollHN(): Promise<void> {
@@ -175,10 +184,13 @@ async function pollHN(): Promise<void> {
     });
     if (!res.ok) throw new Error(`http ${res.status}`);
     const ids = (await res.json()) as number[];
-    const top = Array.isArray(ids) ? ids[0] : undefined;
-    if (typeof top !== 'number' || top === lastTopStory) return;
-    lastTopStory = top;
-    if (hasLiveHeadlineQuest()) return; // ≤1 active rumor quest at a time
+    if (!Array.isArray(ids)) return;
+    if (headlineCooling()) return;
+    // The front page barely moves in 5 minutes, so take the top story we have
+    // not told yet rather than only ids[0] — otherwise the scribe repeats.
+    const top = ids.slice(0, 15).find((id) => typeof id === 'number' && !seenStories.has(id));
+    if (typeof top !== 'number') return;
+    seenStories.add(top);
     const itemRes = await fetch(`https://hacker-news.firebaseio.com/v0/item/${top}.json`, {
       signal: AbortSignal.timeout(8_000),
     });
@@ -186,6 +198,7 @@ async function pollHN(): Promise<void> {
     const item = (await itemRes.json()) as { title?: string; url?: string };
     if (!item?.title) return;
     await scribeQuest(item.title, item.url ?? `https://news.ycombinator.com/item?id=${top}`);
+    lastHeadlineAt = Date.now(); // start the cooldown only once word actually landed
   } catch (e) {
     warnOnce('hn', `[ingest] hacker news unreachable (${e instanceof Error ? e.message : e}) — no new rumor quests`);
   }

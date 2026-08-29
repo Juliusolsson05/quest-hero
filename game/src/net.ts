@@ -6,10 +6,26 @@ import type { ClientFrame, ServerFrame } from '../../shared/protocol';
  * caller shows a "waking the village" overlay until `welcome` arrives.
  */
 
-// `?hub=ws://…` lets a demo (or a mock hub) retarget without a rebuild.
-const HUB_WS =
-  new URLSearchParams(location.search).get('hub') ??
-  import.meta.env.VITE_HUB_WS ?? 'ws://localhost:7777/ws';
+/**
+ * Which hub to talk to. `?hub=wss://…` retargets without a rebuild and is
+ * remembered, so a link handed to a friend keeps its hub as they walk around
+ * and the address bar loses the query. `?hub=` (empty) forgets it again.
+ * Otherwise: the build-time default (VITE_HUB_WS — how the hosted build finds
+ * a tunnelled hub), then localhost for `npm run dev`.
+ */
+const HUB_KEY = 'sfq:hub';
+const HUB_WS = (() => {
+  const q = new URLSearchParams(location.search).get('hub');
+  if (q !== null) {
+    try { q ? localStorage.setItem(HUB_KEY, q) : localStorage.removeItem(HUB_KEY); } catch { /* private mode */ }
+    if (q) return q;
+  }
+  try {
+    const saved = localStorage.getItem(HUB_KEY);
+    if (saved) return saved;
+  } catch { /* private mode */ }
+  return import.meta.env.VITE_HUB_WS ?? 'ws://localhost:7777/ws';
+})();
 
 type Handler = (f: ServerFrame) => void;
 

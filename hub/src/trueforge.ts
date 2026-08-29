@@ -103,6 +103,10 @@ export interface AgentDef {
   json?: boolean;
   /** allow the harness to fan out to parallel subagents (default true) */
   subagents?: boolean;
+  /** provider call params (reasoning effort, temperature…). A character in a
+   *  conversation is latency-sensitive in a way a research agent is not, so
+   *  each agent decides how hard it thinks. */
+  params?: TrueForgeApi.ModelParams;
 }
 
 async function buildManifest(def: AgentDef): Promise<TrueForgeApi.AgentSpec> {
@@ -124,7 +128,7 @@ async function buildManifest(def: AgentDef): Promise<TrueForgeApi.AgentSpec> {
     }
   }
   return {
-    model: { name: model },
+    model: { name: model, ...(def.params ? { params: def.params } : {}) },
     instructions: def.persona,
     ...(names.length
       ? {
@@ -299,9 +303,17 @@ function toolLabel(call: TrueForgeApi.ToolCall): string | null {
   const args = call.function?.arguments ?? '';
   if (!args) return null;
   try {
-    const o = JSON.parse(args) as Record<string, unknown> & { arguments?: Record<string, unknown> };
-    const label = String(o.tool ?? o.name ?? call.function?.name ?? call.toolInfo?.name ?? 'tool');
-    const query = (o.query ?? o.arguments?.query ?? o.input) as string | undefined;
+    const o = JSON.parse(args) as Record<string, unknown> & {
+      arguments?: Record<string, unknown>;
+      input?: Record<string, unknown> | string;
+    };
+    // Deferred tool loading means an MCP call arrives wrapped in the system
+    // `call_tool`, so the name worth showing lives in the arguments —
+    // {mcp_server, tool_name, input} — not on the function.
+    const label = String(o.tool_name ?? o.tool ?? o.name ?? call.function?.name ?? call.toolInfo?.name ?? 'tool');
+    const inner = typeof o.input === 'object' && o.input ? (o.input as Record<string, unknown>) : {};
+    const query = (o.query ?? o.arguments?.query ?? inner.query ?? inner.where ?? inner.source_id ??
+      (typeof o.input === 'string' ? o.input : undefined)) as string | undefined;
     return String(query ? `${label}: ${query}` : label).slice(0, 60);
   } catch {
     return null; // partial JSON — wait for more fragments
@@ -335,7 +347,9 @@ export async function streamTurn(
   const badgeCalls = (msg: TrueForgeApi.ModelMessageEvent, force = false): void => {
     for (const call of msg.toolCalls ?? []) {
       if (!call.id || badged.has(call.id)) continue;
-      if (call.toolInfo?.type === 'truefoundry-system') continue;
+      // `list_tools`/`get_tool_info` are the harness browsing its own catalog:
+      // plumbing, not work the player asked for. `call_tool` is the real one.
+      if (call.toolInfo?.type === 'truefoundry-system' && call.toolInfo?.name !== 'call_tool') continue;
       const label = toolLabel(call) ?? (force ? call.toolInfo?.name ?? call.function?.name ?? 'consulting tools' : null);
       if (!label) continue;
       badged.add(call.id);

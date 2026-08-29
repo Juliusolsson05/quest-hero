@@ -15,6 +15,7 @@ import { HubLink } from './hublink';
 import { IrsEncounter } from './irs';
 import { Minimap } from './minimap';
 import { Multiplayer } from './mp';
+import { PhotoMode } from './photo';
 import { Player } from './player';
 import { initProps3d } from './props3d';
 import { StartScreen } from './start';
@@ -50,6 +51,7 @@ const bubbles = new Bubbles();
 const ui = new Ui();
 const feed = new CityFeed();
 const minimap = new Minimap();
+const photo = new PhotoMode(player); // C — first-person camera, live building dossiers
 new TouchControls(player); // joystick + compact chrome on coarse-pointer devices
 // A lid, not a gate: everything above already renders behind it from the
 // first frame, so the bar below reports asset streaming, not readiness.
@@ -106,6 +108,7 @@ const island: IslandView = new IslandView(generatedIsland);
   scene.add(far.group);
   fx.attachDistance(far.layers);
   minimap.bind(island);
+  photo.bind(island); // every building on the map becomes a photographable subject
 }
 const spawnPos = generatedIsland.pois.find((p) => p.id === 'plaza')?.pos ?? { x: 52, y: 2, z: 43 };
 player.bindIsland(island, new THREE.Vector3(spawnPos.x + 1.4, spawnPos.y, spawnPos.z + 1.6));
@@ -136,7 +139,7 @@ irs.onSeclusion = (secluded) => { mp.avatarsVisible = !secluded; };
 const hub = new HubLink({ player, entities, ui, fx, bubbles, feed, cartly });
 
 if (import.meta.env.DEV) { // console-inspection only — never shipped
-  (window as unknown as Record<string, unknown>).__sfq = { island, player, mp, cartly, irs };
+  (window as unknown as Record<string, unknown>).__sfq = { island, player, mp, cartly, irs, photo };
 }
 
 // ── interactions: ONE priority list serves both the E key and the pill ─────
@@ -167,6 +170,16 @@ const interactables: Interactable[] = [
   },
 ];
 
+// The viewfinder is exclusive: no talk bar may hold the keyboard, and no
+// panel may sit open behind it, while you are framing a shot.
+photo.onToggle = (on) => {
+  if (!on) return;
+  feed.close();
+  ui.closeQuests();
+  ui.closeTalk();
+  ui.setPrompt(null);
+};
+
 /** The E action — also fired by tapping the interaction pill on touch. */
 function interact(): void {
   for (const i of interactables) if (i.act()) return;
@@ -186,6 +199,7 @@ function nearestPoiLabel(): string {
 addEventListener('keydown', (e) => {
   if (e.code === 'Escape' && ui.questsOpen) ui.closeQuests();
   if (document.body.dataset.typing === '1') return;
+  if (photo.active) return; // the viewfinder owns the keyboard — see src/photo.ts
   if (e.code === 'KeyP') { cartly.togglePhone(nearestPoiLabel()); return; }
   if (e.code === 'KeyL') { feed.toggle(); return; }
   if (e.code === 'KeyE') interact();
@@ -241,8 +255,10 @@ renderer.setAnimationLoop(() => {
     );
   }
 
+  photo.update(); // what the lens is pointed at, ~12Hz
+
   // Interaction prompt: the first interactable with something to say wins.
-  if (document.body.dataset.typing !== '1') {
+  if (document.body.dataset.typing !== '1' && !photo.active) {
     let prompt: string | null = null;
     for (const i of interactables) { prompt = i.prompt(); if (prompt) break; }
     ui.setPrompt(prompt);
@@ -254,4 +270,7 @@ renderer.setAnimationLoop(() => {
       : entities.anchor(who));
 
   composer.render();
+  // The shutter reads the drawing buffer, which only holds this frame's pixels
+  // until the next one starts — so it fires here, right after the render.
+  photo.capture(renderer.domElement);
 });

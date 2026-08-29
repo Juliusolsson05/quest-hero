@@ -98,6 +98,37 @@ Two more shipped, each attached to exactly one character — withholding a tool 
 
 **[`wall-street`](mcp/wall-street/)** (:8812) — live quotes, price history, market indices, and official SEC filings behind 7 tools, for Preston, who deals in public markets and actual numbers. No API keys. He never states a figure he did not fetch, and he never gives investment advice.
 
+## Photo mode: point a camera at a building, get real data back
+
+Press **C** (or the 📷 button) and the camera drops into the hero's eyes. Look around,
+frame a building, press **space**. What comes back is not a caption we wrote.
+
+1. **Identity.** `game/src/landmarks.ts` resolves what is in the viewfinder to a real San
+   Francisco building. The eight named landmarks carry their own address and coordinates;
+   every other row house, storefront and office block inherits an identity from the
+   district it stands in — 114 photographable subjects across 19 neighbourhoods. Aiming is
+   angular rather than a mesh raycast, because the world is merged into a handful of
+   per-colour meshes: a raycast tells you which cream-coloured mesh you hit, not which
+   building. Line of sight is checked against the terrain and the other buildings' colliders.
+2. **The lookup.** The subject, its coordinates and the framing go to the hub
+   (`POST /api/photo`), which opens a TrueForge session — one per subject, so the archivist
+   remembers the buildings you keep photographing — with the [`sf-guide`](mcp/sf-guide/) MCP
+   server attached, and streams the turn back over SSE.
+3. **The dossier.** The agent's tool calls stream into the card as it makes them
+   (`sf_describe_dataset: landmarks`, `sf_query_dataset: name like 'Coit'`, `sf_tides_and_sun`),
+   then a caption and three or four facts, each carrying the dataset it came from. It is
+   instructed never to state a number it did not fetch: "Article 10 Historic Landmarks
+   returned no record for this row" is a real finding, and the player gets it rather than a
+   plausible sentence.
+
+Every photograph is also logged to the world event log, so it shows up in the city pulse and
+in the NPCs' `[WORLD NOW]` digest — walk up to a citizen afterwards and they know you have
+been photographing Coit Tower.
+
+If the hub is down, the game talks to TrueForge directly (`game/src/lens.ts`) and says so on
+the card. If neither answers, the card says the archive is out of reach instead of inventing
+a dossier — which is the whole point of the feature.
+
 ## Design note: approval gates are a game mechanic
 
 The hackathon asks for an interface that shows what the agent is doing, what it is waiting on, and asks before the irreversible step. In a game that is not a modal dialog bolted on top — it is the NPC saying *"I can forge that, but it will cost your last ingot. Shall I?"* and waiting. The approval gate and the dialogue are the same thing.

@@ -21,6 +21,16 @@ export class Player {
   /** False while something else owns the hero's pose — a cart ride. The sea
    *  must not grab a passenger who is crossing the bridge above it. */
   controlled = true;
+  /**
+   * Photo mode: the spring arm collapses to the hero's eyes and the pitch
+   * clamp opens up, because the whole point is looking *up* at a building.
+   * Owned here rather than in a camera of its own so that walking, looking and
+   * the movement basis stay one thing — WASD is still relative to where you
+   * are pointed, which is what makes framing a shot feel like standing there.
+   */
+  photoMode = false;
+  /** Vertical field of view while in photo mode: the zoom ring. */
+  photoFov = 40;
 
   /** Fired on the frame the hero hits the water, leaves it, and drifts out
    *  far enough for the current to take hold. */
@@ -77,7 +87,9 @@ export class Player {
       if (document.body.dataset.typing === '1') return;
       if (e.code === 'Space') {
         e.preventDefault(); // otherwise the page scrolls under the canvas
-        this.buffer = Player.BUFFER;
+        // In photo mode space is the shutter: a photographer lining up a shot
+        // should not hop the moment they take it.
+        if (!this.photoMode) this.buffer = Player.BUFFER;
         return;
       }
       this.keys.add(e.code);
@@ -109,17 +121,31 @@ export class Player {
       if (this.pointers.size >= 2) {
         const [a, b] = [...this.pointers.values()];
         const d = Math.hypot(a.x - b.x, a.y - b.y);
-        this.camDist = THREE.MathUtils.clamp(this.camDist - (d - this.pinchDist) * 0.02, 3.5, 18);
+        // Pinching zooms whichever ring is in your hand: the spring arm
+        // normally, the lens in photo mode.
+        if (this.photoMode) this.photoFov = THREE.MathUtils.clamp(this.photoFov - (d - this.pinchDist) * 0.1, 14, 68);
+        else this.camDist = THREE.MathUtils.clamp(this.camDist - (d - this.pinchDist) * 0.02, 3.5, 18);
         this.pinchDist = d;
         return;
       }
-      this.camYaw -= mx * 0.0055;
+      // A long lens magnifies a twitch as much as it magnifies the city, so
+      // looking slows down as you zoom in.
+      const look = this.photoMode ? this.photoFov / 58 : 1;
+      this.camYaw -= mx * 0.0055 * look;
       // On the island the camera never dips near-level (terrain would fill
       // the view); in the arena it must — you cannot aim an SMG at a distant
       // boss with a crosshair that is always pointed at the floor.
-      this.camPitch = THREE.MathUtils.clamp(this.camPitch + my * 0.004, this.arena ? -0.08 : 0.12, 1.25);
+      this.camPitch = THREE.MathUtils.clamp(
+        this.camPitch + my * 0.004 * look,
+        this.photoMode ? -1.15 : this.arena ? -0.08 : 0.12,
+        1.25,
+      );
     });
     addEventListener('wheel', (e) => {
+      if (this.photoMode) { // the zoom ring, not the spring arm
+        this.photoFov = THREE.MathUtils.clamp(this.photoFov + Math.sign(e.deltaY) * 3, 14, 68);
+        return;
+      }
       this.camDist = THREE.MathUtils.clamp(this.camDist + Math.sign(e.deltaY) * 0.8, 3.5, 18);
     }, { passive: true });
   }
@@ -206,6 +232,37 @@ export class Player {
   /** Enter (or with null, leave) an off-grid room. */
   setArena(a: Player['arena']): void {
     this.arena = a;
+  }
+
+  /**
+   * Enter or leave the viewfinder. The hero's own mesh goes with it — you
+   * cannot stand behind your own head — and the pitch is pulled back into the
+   * orbit camera's range on the way out, or the third-person view would come
+   * back staring at the sky.
+   */
+  setPhotoMode(on: boolean): void {
+    if (this.photoMode === on) return;
+    this.photoMode = on;
+    this.view.root.visible = !on;
+    if (on) {
+      // The orbit camera looks down at the hero; a photographer raising a
+      // camera looks at the horizon. Keep the yaw — you were facing that way
+      // for a reason — and level the pitch.
+      this.camPitch = Math.min(this.camPitch, 0.06);
+    } else {
+      this.camPitch = THREE.MathUtils.clamp(this.camPitch, 0.12, 1.25);
+      this.camera.fov = 58;
+      this.camera.updateProjectionMatrix();
+    }
+  }
+
+  /** Where the lens is pointed, as a unit vector — what the aim test needs. */
+  viewDir(): THREE.Vector3 {
+    return new THREE.Vector3(
+      -Math.sin(this.camYaw) * Math.cos(this.camPitch),
+      -Math.sin(this.camPitch),
+      -Math.cos(this.camYaw) * Math.cos(this.camPitch),
+    );
   }
 
   /** Point the camera (cutscene entrances: face the taxcollector, not a wall). */
@@ -335,6 +392,19 @@ export class Player {
     this.view.update(dt);
     this.view.root.position.copy(this.pos);
     this.view.root.rotation.y = this.rot;
+
+    // Viewfinder: the camera *is* the hero's eyes. No spring, no lerp, no
+    // occlusion pull-in — a viewfinder that drifts toward where you looked is
+    // impossible to aim, and there is nothing left to be occluded by.
+    if (this.photoMode) {
+      if (this.camera.fov !== this.photoFov) {
+        this.camera.fov = this.photoFov;
+        this.camera.updateProjectionMatrix();
+      }
+      this.camera.position.set(this.pos.x, this.pos.y + 1.55, this.pos.z);
+      this.camera.lookAt(this.camera.position.clone().add(this.viewDir()));
+      return;
+    }
 
     // Spring-arm camera.
     const target = new THREE.Vector3(this.pos.x, this.pos.y + 1.35, this.pos.z);

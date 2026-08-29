@@ -70,6 +70,31 @@ interface World  { time: {phase:TimePhase; hour:number; real:boolean};
 
 Errors: `4xx {error: string}`. Unknown `kind`/`poi`/ids → `400` with the allowed values listed.
 
+## Photo mode `POST /api/photo` (SSE)
+
+The camera's dossier stream (`hub/src/photo.ts`). The client sends the building it
+photographed; the hub runs one TrueForge session per subject with the `sf-guide` MCP
+server attached and streams the agent's work back as it happens. Every photograph is
+also logged as an `mcp.custom` event, so NPCs can gossip about what you have been
+pointing a camera at.
+
+```jsonc
+// request
+{
+  "subject": { "id": "coit", "name": "Coit Tower", "where": "1 Telegraph Hill Boulevard",
+               "district": "Telegraph Hill", "lat": 37.8024, "lon": -122.4058,
+               "sources": ["landmarks", "public_art"] },   // dataset hints, optional
+  "shot":    { "distanceM": 9, "bearing": "north", "focalMm": 33 }
+}
+// response: text/event-stream
+data: {"t":"tool","label":"sf_query_dataset: name like 'Coit'"}
+data: {"t":"delta","text":"CAPTION: Coit Tower, bright on Telegraph Hill…"}
+data: {"t":"done"}          // or {"t":"error","message":"…"} if nothing arrived at all
+```
+
+The reply is `CAPTION: …` followed by `- fact — source: dataset` lines. A stream that
+dies mid-dossier still ends `done`: partial real data beats an error that throws it away.
+
 ## WebSocket `ws://localhost:7777/ws` (game client protocol)
 
 Server→client frames (JSON, `{t: type, ...}`):

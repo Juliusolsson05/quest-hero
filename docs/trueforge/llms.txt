@@ -1,0 +1,89 @@
+# TrueForge
+
+> Open-source agent harness — MCP tools, skills, sandboxing, approvals, and subagents.
+
+- [TrueForge](https://trueforge.dev/introduction.md): TrueForge is an open-source agent harness — the runtime layer that turns an LLM into a working agent, with MCP tools, skills, sandboxing, approvals, and subagents built in.
+- [Quickstart](https://trueforge.dev/quickstart.md): Run TrueForge, connect a model and tools, and build your first reusable agent — step by step.
+- [Initial Setup](https://trueforge.dev/harness/initial-setup.md): Configure models, MCP servers, skills, and a sandbox provider once — then reuse them across every agent.
+- [Setup Models](https://trueforge.dev/models.md): Connect model providers from the shipped catalog or add a custom OpenAI-compatible endpoint.
+- [Setup MCP Servers](https://trueforge.dev/mcp-servers.md): Connect remote MCP servers from the shipped catalog or your own URL — with header auth or OAuth.
+- [Setup Skills](https://trueforge.dev/skills.md): Register git-backed SKILL.md instruction packs from the shipped catalog or your own repository.
+- [Setup Sandbox](https://trueforge.dev/sandbox.md): Connect an isolated execution environment for code, files, and shell commands — provisioned only when the agent needs one.
+- [Create an Agent](https://trueforge.dev/create-agent/overview.md): Every option on an agent, what the UI covers today, and how to set the rest via the API.
+- [Agents Library](https://trueforge.dev/agent-library.md): Browse, edit, and try saved agents from one place.
+- [Harness Capabilities](https://trueforge.dev/key-features/overview.md): Sandbox-as-tool, context engineering, human checkpoints, and Generative UI — how TrueForge keeps agents reliable and efficient.
+- [Subagents](https://trueforge.dev/key-features/subagents.md): The harness delegates focused subtasks to parallel subagents, keeping the root agent's context clean.
+- [Deferred Tool Loading](https://trueforge.dev/key-features/deferred-tool-loading.md): Control whether MCP tool definitions are preloaded into agent context or discovered on demand.
+- [Code Mode](https://trueforge.dev/key-features/code-mode.md): Run a single script in the sandbox to aggregate tool output or chain MCP tool calls — also known as Programmatic Tool Calling (PTC).
+- [Handling Large Tool Responses](https://trueforge.dev/key-features/large-tool-responses.md): Automatically offload large MCP tool responses to the sandbox instead of flooding the agent's context window.
+- [Setup Login](https://trueforge.dev/authentication/overview.md): Keep the no-auth default for local use, or turn on OIDC so your team signs in with your identity provider.
+- [Benchmarking](https://trueforge.dev/benchmarking.md): How TrueForge compares to Claude Managed Agents and deepagents on the same tasks, tools, and model — and how to reproduce it.
+- [SDK Quickstart](https://trueforge.dev/api/quickstart.md): Install the SDK, connect to your TrueForge server, and stream your first agent turn in a few minutes.
+- [SDK Concepts](https://trueforge.dev/api/overview.md): The mental model behind the SDK — Agent, Session, Turn, Event, and Delta — with one worked example.
+- [Use an agent](https://trueforge.dev/api/use-agent.md): Run a saved agent with the TypeScript SDK: a Quick Start, then recipes for streaming, approvals, questions, threads, and reconnects.
+- [TrueForge UI SDK](https://trueforge.dev/chat-ui.md): Use the bundled TrueForge chat experience — or embed the same UI in your app with the React UI SDK.
+- [Quickstart](https://trueforge.dev/ui-sdk/get-started/quickstart.md): Render a working agent chat UI against a TrueForge server
+- [Layout, Theming & Branding](https://trueforge.dev/ui-sdk/guides/layouts-and-theme.md): Layout, Presets themes, Branding, and Dark mode.
+- [Agent modes](https://trueforge.dev/ui-sdk/guides/agent-modes.md): Choose from four agent modes: fixed agent, agent library, agent composer, or library + composer.
+- [Custom Theme](https://trueforge.dev/ui-sdk/setup-custom-ui/custom-theme.md): Build your own custom theme
+- [Troubleshooting](https://trueforge.dev/ui-sdk/guides/troubleshooting.md): Common failure modes and their causes.
+- [TrueForgeUI](https://trueforge.dev/ui-sdk/reference/trueforge-ui.md): The entry component and every prop it accepts.
+- [Theme](https://trueforge.dev/ui-sdk/reference/theme.md): Theme provider, hooks, presets, brand, and slots.
+- [Containers](https://trueforge.dev/ui-sdk/reference/containers.md): Runtime-connected building blocks for custom layouts.
+- [Atoms](https://trueforge.dev/ui-sdk/reference/atoms.md): Presentational components and their prop types.
+- [Hooks](https://trueforge.dev/ui-sdk/reference/hooks.md): Composer state, MCP auth, runtime hooks, and re-exports.
+- [Server](https://trueforge.dev/ui-sdk/reference/server.md): Server factory, context hooks, shell mode, and contract types.
+- [Streaming events](https://trueforge.dev/ui-sdk/reference/events.md): The event protocol createTurn yields and the UI folds into a transcript.
+- [Settings catalog](https://trueforge.dev/ui-sdk/reference/catalog.md): The optional catalog port behind the model, connector, skill, and sandbox settings.
+- [Roadmap](https://trueforge.dev/roadmap.md): Where TrueForge is headed — planned work across gateway integration, local mode, the harness, agent authoring, approvals, and evaluation.
+- [List agents](https://trueforge.dev/api-reference/agents/list-agents.md): All configured agents for the tenant.
+- [Create an agent](https://trueforge.dev/api-reference/agents/create-an-agent.md): Creates an agent and allocates an immutable id. Fails if `name` is already taken. Name cannot be changed later.
+- [Get an agent](https://trueforge.dev/api-reference/agents/get-an-agent.md): Fetch a configured agent by immutable id.
+- [Update an agent](https://trueforge.dev/api-reference/agents/update-an-agent.md): Replaces the manifest for an existing agent keyed by immutable `agent_id`.
+- [Delete an agent](https://trueforge.dev/api-reference/agents/delete-an-agent.md): Delete a configured agent by immutable id. Idempotent if already gone.
+- [Current session](https://trueforge.dev/api-reference/auth/current-session.md): Returns the authenticated caller identity. When auth is enabled this requires a valid `id_token` cookie or `Authorization: Bearer` ID token (401 otherwise). When auth is disabled, returns the default identity.
+- [Get server capabilities](https://trueforge.dev/api-reference/capabilities/get-server-capabilities.md): Report optional runtime capabilities available for this tenant.
+- [Get the MCP catalog](https://trueforge.dev/api-reference/mcp-servers/get-the-mcp-catalog.md): Shipped MCP server presets (discovery-only). Copy into PUT /settings/mcp-servers to configure.
+- [List MCP servers for chat](https://trueforge.dev/api-reference/mcp-servers/list-mcp-servers-for-chat.md): MCP servers as a slim name/url list for the composer. No auth or auth_status.
+- [Start (or short-circuit) the auth flow for an MCP server](https://trueforge.dev/api-reference/mcp-servers/start-or-short-circuit-the-auth-flow-for-an-mcp-server.md): For servers without auth returns not_required, and for header credentials returns authenticated (no browser flow). For auth.type dcr, returns authenticated when a usable (or refreshable) token exists; otherwise runs DCR if needed and returns auth_required with an authorization URL. Optional return_t…
+- [Disconnect OAuth for an MCP server](https://trueforge.dev/api-reference/mcp-servers/disconnect-oauth-for-an-mcp-server.md): For auth.type dcr, deletes the stored OAuth token and returns the server with auth_status auth_required, keeping the dynamically registered OAuth client so the next authorize can reuse it. No-op for header or no-auth servers (returns the server unchanged).
+- [List tools of an MCP server](https://trueforge.dev/api-reference/mcp-servers/list-tools-of-an-mcp-server.md): All tools exposed by the given MCP server (non-paginated), as returned by the MCP `tools/list` call.
+- [List MCP servers](https://trueforge.dev/api-reference/mcp-servers/list-mcp-servers.md): All MCP servers with nested auth_status (settings / admin projection). Header auth values are redacted.
+- [Create or replace an MCP server](https://trueforge.dev/api-reference/mcp-servers/create-or-replace-an-mcp-server.md): Create or replace by `name`. Does not start DCR or change oauth client columns. Header secrets: real value sets/rotates; redacted keeps existing (400 if none).
+- [Create an MCP server](https://trueforge.dev/api-reference/mcp-servers/create-an-mcp-server.md): Creates an MCP server by `name`. Fails if `name` is already taken. Runs DCR registration when `auth.type` is `dcr`. Header secrets: real value required; redacted with no stored value returns 400.
+- [Get a single MCP server by name](https://trueforge.dev/api-reference/mcp-servers/get-a-single-mcp-server-by-name.md): A single MCP server by name, with nested auth_status (settings / admin projection). Header auth values are redacted.
+- [Get the model catalog](https://trueforge.dev/api-reference/models/get-the-model-catalog.md): Shipped model-provider presets (discovery-only). Copy into PUT /settings/model-providers to configure. Includes a `custom` sentinel with `supported_reasoning_efforts`.
+- [List models for chat](https://trueforge.dev/api-reference/models/list-models-for-chat.md): Configured models as a slim FQN list for the composer.
+- [List configured model providers](https://trueforge.dev/api-reference/models/list-configured-model-providers.md): All configured providers with nested manifests.
+- [Create or replace a model provider](https://trueforge.dev/api-reference/models/create-or-replace-a-model-provider.md): Create or replace a provider (models included). Well-known types use `type` as `name` (one each); `custom` is named by the caller. `auth.api_key`: real value sets/rotates; redacted keeps existing (400 if none).
+- [Create a model provider](https://trueforge.dev/api-reference/models/create-a-model-provider.md): Creates a provider (models included). Fails if `name` is already taken. Well-known types use `type` as `name` (one each); `custom` is named by the caller. `auth.api_key`: real value required; redacted with no stored secret returns 400.
+- [Get the sandbox provider catalog](https://trueforge.dev/api-reference/sandboxes/get-the-sandbox-provider-catalog.md): Shipped sandbox-provider presets (discovery-only). Copy into PUT /settings/sandbox-providers to configure.
+- [Get the configured sandbox provider](https://trueforge.dev/api-reference/sandboxes/get-the-configured-sandbox-provider.md): The single configured sandbox provider for this tenant. `auth.api_key` is redacted.
+- [Create or replace the sandbox provider](https://trueforge.dev/api-reference/sandboxes/create-or-replace-the-sandbox-provider.md): Upserts the single sandbox provider for this tenant: creates it or replaces its entire configuration. `auth.api_key`: real value sets/rotates; redacted keeps existing (400 if none).
+- [Get the skill catalog](https://trueforge.dev/api-reference/skills/get-the-skill-catalog.md): Shipped skill presets (discovery-only). Copy into PUT /settings/skills to configure.
+- [List configured skills](https://trueforge.dev/api-reference/skills/list-configured-skills.md): All configured skills with nested manifests (settings / admin projection).
+- [Create or replace a skill](https://trueforge.dev/api-reference/skills/create-or-replace-a-skill.md): Full upsert keyed by `name`: creates the skill or replaces its entire manifest.
+- [Create a skill](https://trueforge.dev/api-reference/skills/create-a-skill.md): Creates a skill keyed by `name`. Fails if `name` is already taken.
+- [List skills for chat](https://trueforge.dev/api-reference/skills/list-skills-for-chat.md): Configured skills as a slim name/description list for the composer.
+- [List schedules](https://trueforge.dev/api-reference/schedules/list-schedules.md): List schedules for the tenant, newest first. Optionally filter by `agent_name`.
+- [Create a schedule](https://trueforge.dev/api-reference/schedules/create-a-schedule.md): Create a schedule for an existing agent (by name) and add its first pending run when active.
+- [Get a schedule](https://trueforge.dev/api-reference/schedules/get-a-schedule.md): Get a schedule by id.
+- [Update a schedule](https://trueforge.dev/api-reference/schedules/update-a-schedule.md): Replace name and manifest; replaces or drops the pending run when status/cron/timezone change.
+- [Delete a schedule](https://trueforge.dev/api-reference/schedules/delete-a-schedule.md): Delete a schedule and its runs. Idempotent.
+- [List sessions](https://trueforge.dev/api-reference/agent-sessions/list-sessions.md): List the caller's sessions (newest first by default), token-paginated. Results are scoped to the authenticated identity via the session store's `created_by` filter (not a client query param). Optional `agent_id` filters to sessions bound to that named agent. Pass `page_token` to fetch the next page,…
+- [Create a session](https://trueforge.dev/api-reference/agent-sessions/create-a-session.md): Create a session with `agent` as either `{ name }` (named registry binding) or `{ spec: AgentSpec }` (inline). Named sessions snapshot the agent name at create and resolve the live agent on each turn. Responses use `{ type: "reference", name, id }` or `{ type: "inline", spec }`.
+- [Get a session](https://trueforge.dev/api-reference/agent-sessions/get-a-session.md): Fetch a session by ID. Only the session creator (`created_by`) may fetch it.
+- [Delete a session](https://trueforge.dev/api-reference/agent-sessions/delete-a-session.md): Delete a session and all related turns, events, and internal state. Only the session creator (`created_by`) may delete it. Idempotent if already gone.
+- [Update a session](https://trueforge.dev/api-reference/agent-sessions/update-a-session.md): Update a session by replacing `agent` with `{ spec: AgentSpec }`. Named (reference) sessions reject agent updates. An empty body is a valid no-op that refreshes `updated_at`. Only the session creator (`created_by`) may update it.
+- [Cancel a running turn in a session](https://trueforge.dev/api-reference/agent-sessions/cancel-a-running-turn-in-a-session.md): Cancel the running last turn for a session. Only the session creator (`created_by`) may cancel.
+- [List session events](https://trueforge.dev/api-reference/agent-sessions/list-session-events.md): List session events as `{ turn_id, event }` across the active turn branch (newest first), including persisted events from a running tip. Each turn contributes turn.created, content events (model.message, tool.call, …), and turn.done when terminal; streaming deltas are not included. Use `page_token`…
+- [List turns in a session](https://trueforge.dev/api-reference/agent-sessions/list-turns-in-a-session.md): List turns for a session (newest first by default), token-paginated. Only the session creator (`created_by`) may list turns.
+- [Create and execute a turn in a session](https://trueforge.dev/api-reference/agent-sessions/create-and-execute-a-turn-in-a-session.md): Create a turn within a session and execute it. Only the session creator (`created_by`) may create turns. When `stream` is true (default), respond with a Server-Sent Events stream of turn events. When `stream` is false, return the turn immediately with `state.status: "running"` while execution contin…
+- [Get a turn](https://trueforge.dev/api-reference/agent-sessions/get-a-turn.md): Fetch a single turn by ID. Only the session creator (`created_by`) may fetch it.
+- [Download a file from the turn sandbox](https://trueforge.dev/api-reference/agent-sessions/download-a-file-from-the-turn-sandbox.md): Download a file from the sandbox this turn ran in. Paths come from the assistant's `sandbox_artifacts` block. Only the session creator (`created_by`) may download.
+- [List turn events](https://trueforge.dev/api-reference/agent-sessions/list-turn-events.md): Paginated persisted events for a turn (insertion order by default). Only the session creator (`created_by`) may list events.
+- [Subscribe to a running turn](https://trueforge.dev/api-reference/agent-sessions/subscribe-to-a-running-turn.md): Subscribe to the live SSE stream for a turn. Only the session creator (`created_by`) may subscribe. Pass `after_sequence_number` to resume after a disconnect (exclusive — events after this sequence number are replayed).
+
+## OpenAPI Specs
+
+- [openapi](/openapi.json)

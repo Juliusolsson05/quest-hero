@@ -1,0 +1,1263 @@
+> ## Documentation Index
+> Fetch the complete documentation index at: https://trueforge.dev/llms.txt
+> Use this file to discover all available pages before exploring further.
+
+# Subscribe to a running turn
+
+> Subscribe to the live SSE stream for a turn. Only the session creator (`created_by`) may subscribe. Pass `after_sequence_number` to resume after a disconnect (exclusive — events after this sequence number are replayed).
+
+
+
+## OpenAPI
+
+````yaml /openapi.json get /api/v1/sessions/{session_id}/turns/{turn_id}/subscribe
+openapi: 3.1.0
+info:
+  description: >-
+    HTTP API for the TrueForge agent server (`/api/v1`). Interactive docs are
+    served at `/api/v1/docs` (OpenAPI JSON at `/api/v1/openapi.json`).
+
+
+    **Authentication:** Standalone deployments (no OIDC) accept requests without
+    credentials — middleware stamps a local default user. When OIDC is
+    configured, protected routes require a valid `id_token` cookie or
+    `Authorization: Bearer` ID token. There is no built-in API-key scheme; pass
+    custom headers only if your reverse proxy or IdP layer requires them.
+
+
+    Covers DB-backed sessions, the agent registry, settings catalogs, and
+    model/MCP/skill/sandbox providers.
+  title: TrueForge API
+  version: 0.2.0-rc.0
+servers: []
+security:
+  - BearerAuth: []
+tags:
+  - name: Auth
+  - name: Capabilities
+  - name: Models
+  - name: MCP Servers
+  - name: Skills
+  - name: Sandboxes
+  - name: Agents
+  - name: Schedules
+  - name: Agent Sessions
+paths:
+  /api/v1/sessions/{session_id}/turns/{turn_id}/subscribe:
+    get:
+      tags:
+        - Agent Sessions
+      summary: Subscribe to a running turn
+      description: >-
+        Subscribe to the live SSE stream for a turn. Only the session creator
+        (`created_by`) may subscribe. Pass `after_sequence_number` to resume
+        after a disconnect (exclusive — events after this sequence number are
+        replayed).
+      parameters:
+        - description: Session identifier.
+          in: path
+          name: session_id
+          required: true
+          schema:
+            description: Session identifier.
+            maxLength: 64
+            minLength: 1
+            type: string
+        - description: Turn identifier.
+          in: path
+          name: turn_id
+          required: true
+          schema:
+            description: Turn identifier.
+            minLength: 1
+            type: string
+        - description: >-
+            Exclusive resume cursor: replay only events with a sequence number
+            greater than this value. Omit to start from the beginning of the
+            live buffer.
+          in: query
+          name: after_sequence_number
+          required: false
+          schema:
+            description: >-
+              Exclusive resume cursor: replay only events with a sequence number
+              greater than this value. Omit to start from the beginning of the
+              live buffer.
+            minimum: 0
+            type:
+              - integer
+              - 'null'
+      responses:
+        '200':
+          content:
+            text/event-stream:
+              schema:
+                $ref: '#/components/schemas/TurnStreamingEvent'
+          description: Server-Sent Events stream of turn events (deltas and lifecycle).
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RequestErrorResponse'
+          description: Invalid query parameters.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RequestErrorResponse'
+          description: Caller is not the session creator.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RequestErrorResponse'
+          description: Turn not found.
+        '412':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RequestErrorResponse'
+          description: Cannot subscribe — the live stream no longer exists.
+components:
+  schemas:
+    TurnStreamingEvent:
+      discriminator:
+        mapping:
+          mcp.auth_required:
+            $ref: '#/components/schemas/MCPAuthRequiredEvent'
+          mcp.initialize:
+            $ref: '#/components/schemas/MCPInitializeEvent'
+          model.message:
+            $ref: '#/components/schemas/ModelMessageEvent'
+          model.message.delta:
+            $ref: '#/components/schemas/ModelMessageDeltaEvent'
+          sandbox.created:
+            $ref: '#/components/schemas/SandboxCreatedEvent'
+          thread.created:
+            $ref: '#/components/schemas/ThreadCreatedEvent'
+          thread.done:
+            $ref: '#/components/schemas/ThreadDoneEvent'
+          tool.approval_required:
+            $ref: '#/components/schemas/ToolApprovalRequiredEvent'
+          tool.response:
+            $ref: '#/components/schemas/ToolResponseEvent'
+          tool.response_required:
+            $ref: '#/components/schemas/ToolResponseRequiredEvent'
+          turn.created:
+            $ref: '#/components/schemas/TurnCreatedEvent'
+          turn.done:
+            $ref: '#/components/schemas/TurnDoneEvent'
+        propertyName: type
+      oneOf:
+        - $ref: '#/components/schemas/ModelMessageEvent'
+        - $ref: '#/components/schemas/ModelMessageDeltaEvent'
+        - $ref: '#/components/schemas/ToolResponseEvent'
+        - $ref: '#/components/schemas/ThreadCreatedEvent'
+        - $ref: '#/components/schemas/ThreadDoneEvent'
+        - $ref: '#/components/schemas/MCPAuthRequiredEvent'
+        - $ref: '#/components/schemas/MCPInitializeEvent'
+        - $ref: '#/components/schemas/SandboxCreatedEvent'
+        - $ref: '#/components/schemas/ToolApprovalRequiredEvent'
+        - $ref: '#/components/schemas/ToolResponseRequiredEvent'
+        - $ref: '#/components/schemas/TurnCreatedEvent'
+        - $ref: '#/components/schemas/TurnDoneEvent'
+    RequestErrorResponse:
+      properties:
+        error:
+          properties:
+            code:
+              description: Optional machine-readable error code; null when not applicable.
+              type:
+                - string
+                - 'null'
+            message:
+              description: Human-readable explanation of the failure.
+              type: string
+            param:
+              description: >-
+                Optional request field that caused the error; null when not
+                field-specific.
+              type:
+                - string
+                - 'null'
+            type:
+              description: Optional error category (e.g. validation vs conflict).
+              type: string
+          required:
+            - message
+          type: object
+      required:
+        - error
+      type: object
+    MCPAuthRequiredEvent:
+      allOf:
+        - $ref: '#/components/schemas/BaseMCPAuthRequiredEvent'
+        - properties:
+            mcp_servers:
+              description: Servers that need authorization, each with an auth_url.
+              items:
+                $ref: '#/components/schemas/MCPServerAuthInfo'
+              type: array
+            type:
+              description: One or more MCP servers need OAuth before tools can run.
+              enum:
+                - mcp.auth_required
+              type: string
+          required:
+            - type
+            - mcp_servers
+          type: object
+    MCPInitializeEvent:
+      properties:
+        created_at:
+          description: ISO 8601 event timestamp.
+          type: string
+        id:
+          description: Unique identifier for the event (monotonic ULID).
+          type: string
+        mcp_servers:
+          description: Servers that were initialized.
+          items:
+            $ref: '#/components/schemas/MCPServerInitInfo'
+          type: array
+        thread_id:
+          description: Thread that triggered initialization.
+          type: string
+        type:
+          description: MCP server(s) initialized for this turn.
+          enum:
+            - mcp.initialize
+          type: string
+      required:
+        - type
+        - id
+        - created_at
+        - thread_id
+        - mcp_servers
+      type: object
+    ModelMessageEvent:
+      properties:
+        content:
+          anyOf:
+            - type: string
+            - items:
+                anyOf:
+                  - $ref: '#/components/schemas/ChatCompletionContentPartText'
+                  - $ref: '#/components/schemas/ChatCompletionContentPartRefusal'
+              type: array
+            - type: 'null'
+          description: Assistant message content as text or content parts.
+        created_at:
+          description: ISO 8601 event timestamp.
+          type: string
+        finish_reason:
+          anyOf:
+            - $ref: '#/components/schemas/FinishReason'
+            - type: 'null'
+          description: Model finish reason; null when the provider omitted it.
+        id:
+          description: Unique identifier for the event (monotonic ULID).
+          type: string
+        name:
+          description: Optional participant name.
+          type: string
+        reasoning_content:
+          type: string
+        refusal:
+          description: Optional refusal text.
+          type:
+            - string
+            - 'null'
+        thread_id:
+          description: Thread that emitted this message (`main` for the root agent).
+          type: string
+        tool_calls:
+          items:
+            $ref: '#/components/schemas/ToolCall'
+          type: array
+        type:
+          description: Complete assistant model message.
+          enum:
+            - model.message
+          type: string
+        usage:
+          $ref: '#/components/schemas/ModelMessageUsage'
+      required:
+        - type
+        - id
+        - thread_id
+        - created_at
+      type: object
+    ModelMessageDeltaEvent:
+      properties:
+        content:
+          description: Incremental assistant text content.
+          type:
+            - string
+            - 'null'
+        created_at:
+          description: Optional ISO 8601 event timestamp.
+          type: string
+        finish_reason:
+          anyOf:
+            - $ref: '#/components/schemas/FinishReason'
+            - type: 'null'
+          description: Finish reason when this delta completes the stream.
+        id:
+          description: Unique identifier for the event (monotonic ULID).
+          type: string
+        reasoning_content:
+          type: string
+        refusal:
+          description: Incremental refusal text when present.
+          type:
+            - string
+            - 'null'
+        thread_id:
+          description: Thread that emitted this delta.
+          type: string
+        tool_calls:
+          items:
+            $ref: '#/components/schemas/ExtendedChunkDeltaToolCall'
+          type: array
+        type:
+          description: Streaming delta for a model.message.
+          enum:
+            - model.message.delta
+          type: string
+        usage:
+          $ref: '#/components/schemas/ModelMessageUsage'
+      required:
+        - type
+        - id
+        - thread_id
+      type: object
+    SandboxCreatedEvent:
+      properties:
+        created_at:
+          description: ISO 8601 event timestamp.
+          type: string
+        id:
+          description: Unique identifier for the event (monotonic ULID).
+          type: string
+        sandbox_id:
+          description: Provider sandbox id.
+          type: string
+        thread_id:
+          description: Always null — sandbox is session-scoped.
+          type:
+            - string
+            - 'null'
+        type:
+          description: A sandbox was created for this session.
+          enum:
+            - sandbox.created
+          type: string
+      required:
+        - type
+        - id
+        - created_at
+        - sandbox_id
+        - thread_id
+      type: object
+    ThreadCreatedEvent:
+      properties:
+        agent_info:
+          $ref: '#/components/schemas/AgentInfo'
+        created_at:
+          description: ISO 8601 event timestamp.
+          type: string
+        id:
+          description: Unique identifier for the event (monotonic ULID).
+          type: string
+        parent:
+          $ref: '#/components/schemas/AgentParent'
+        thread_id:
+          description: Id of the new thread.
+          type: string
+        title:
+          description: Human-readable thread title.
+          type: string
+        type:
+          description: A dynamic subagent thread was created.
+          enum:
+            - thread.created
+          type: string
+      required:
+        - type
+        - id
+        - agent_info
+        - created_at
+        - parent
+        - thread_id
+        - title
+      type: object
+    ThreadDoneEvent:
+      allOf:
+        - $ref: '#/components/schemas/BaseThreadDoneEvent'
+        - properties:
+            created_at:
+              description: ISO 8601 event timestamp.
+              type: string
+            id:
+              description: Unique identifier for the event (monotonic ULID).
+              type: string
+            state:
+              $ref: '#/components/schemas/ThreadState'
+            type:
+              description: A thread reached a terminal state.
+              enum:
+                - thread.done
+              type: string
+          required:
+            - type
+            - id
+            - created_at
+            - state
+          type: object
+    ToolApprovalRequiredEvent:
+      properties:
+        created_at:
+          description: ISO 8601 event timestamp.
+          type: string
+        id:
+          description: Unique identifier for the event (monotonic ULID).
+          type: string
+        thread_id:
+          description: Thread that owns the pending tool calls.
+          type: string
+        tool_calls:
+          description: Tool calls waiting for approval.
+          items:
+            $ref: '#/components/schemas/ToolCallRef'
+          type: array
+        type:
+          description: One or more tool calls need human approval.
+          enum:
+            - tool.approval_required
+          type: string
+      required:
+        - type
+        - id
+        - created_at
+        - thread_id
+        - tool_calls
+      type: object
+    ToolResponseEvent:
+      properties:
+        content:
+          type: string
+        created_at:
+          description: ISO 8601 event timestamp.
+          type: string
+        id:
+          description: Unique identifier for the event (monotonic ULID).
+          type: string
+        thread_id:
+          description: Thread that owns the tool call.
+          type: string
+        tool_call_id:
+          description: Id of the tool call this message responds to.
+          type: string
+        type:
+          description: Result of a tool execution.
+          enum:
+            - tool.response
+          type: string
+      required:
+        - tool_call_id
+        - content
+        - type
+        - id
+        - thread_id
+        - created_at
+      type: object
+    ToolResponseRequiredEvent:
+      properties:
+        created_at:
+          description: ISO 8601 event timestamp.
+          type: string
+        id:
+          description: Unique identifier for the event (monotonic ULID).
+          type: string
+        thread_id:
+          description: Thread that owns the pending tool calls.
+          type: string
+        tool_calls:
+          description: Tool calls waiting for a client response.
+          items:
+            $ref: '#/components/schemas/ToolCallRef'
+          type: array
+        type:
+          description: One or more client-side tool calls need a user/tool response.
+          enum:
+            - tool.response_required
+          type: string
+      required:
+        - type
+        - id
+        - created_at
+        - thread_id
+        - tool_calls
+      type: object
+    TurnCreatedEvent:
+      properties:
+        created_at:
+          description: ISO 8601 event timestamp.
+          type: string
+        id:
+          description: Unique identifier for the event (monotonic ULID).
+          type: string
+        input:
+          description: Input items supplied when the turn was created.
+          items:
+            $ref: '#/components/schemas/TurnInputItem'
+          type: array
+        previous_turn_id:
+          description: Prior turn this turn chains from; null for a root turn.
+          type:
+            - string
+            - 'null'
+        state:
+          $ref: '#/components/schemas/TurnStateRunning'
+        thread_id:
+          description: Thread that owns the event; null for turn-level lifecycle events.
+          type:
+            - string
+            - 'null'
+        turn_id:
+          description: Id of the newly created turn.
+          type: string
+        type:
+          description: Emitted when a turn starts.
+          enum:
+            - turn.created
+          type: string
+      required:
+        - type
+        - id
+        - turn_id
+        - previous_turn_id
+        - state
+        - created_at
+        - thread_id
+      type: object
+    TurnDoneEvent:
+      properties:
+        created_at:
+          description: ISO 8601 event timestamp.
+          type: string
+        id:
+          description: Unique identifier for the event (monotonic ULID).
+          type: string
+        state:
+          description: Terminal turn state (done, cancelled, or error).
+          discriminator:
+            mapping:
+              cancelled:
+                $ref: '#/components/schemas/TurnStateCancelled'
+              done:
+                $ref: '#/components/schemas/TurnStateDone'
+              error:
+                $ref: '#/components/schemas/TurnStateError'
+            propertyName: status
+          oneOf:
+            - $ref: '#/components/schemas/TurnStateDone'
+            - $ref: '#/components/schemas/TurnStateCancelled'
+            - $ref: '#/components/schemas/TurnStateError'
+        thread_id:
+          description: Thread that owns the event; null for turn-level lifecycle events.
+          type:
+            - string
+            - 'null'
+        type:
+          description: Emitted when a turn reaches a terminal state.
+          enum:
+            - turn.done
+          type: string
+      required:
+        - type
+        - id
+        - state
+        - created_at
+        - thread_id
+      type: object
+    BaseMCPAuthRequiredEvent:
+      properties:
+        created_at:
+          description: ISO 8601 event timestamp.
+          type: string
+        id:
+          description: Unique identifier for the event (monotonic ULID).
+          type: string
+        thread_id:
+          description: Always null — this is a run-level event.
+          type:
+            - string
+            - 'null'
+      required:
+        - id
+        - created_at
+        - thread_id
+      type: object
+    MCPServerAuthInfo:
+      properties:
+        auth_url:
+          description: URL the user must visit to complete OAuth for this server.
+          type: string
+        id:
+          description: Internal MCP server id.
+          type: string
+        name:
+          description: Configured MCP server name.
+          type: string
+      required:
+        - id
+        - name
+        - auth_url
+      type: object
+    MCPServerInitInfo:
+      properties:
+        id:
+          description: Internal MCP server id.
+          type: string
+        name:
+          description: Configured MCP server name.
+          type: string
+        session_id:
+          description: Optional MCP session id from the transport.
+          type: string
+        transport_type:
+          description: Transport used to connect to the MCP server.
+          enum:
+            - streamable-http
+            - sse
+          type: string
+      required:
+        - id
+        - name
+      type: object
+    ChatCompletionContentPartText:
+      properties:
+        text:
+          description: Plain-text content.
+          type: string
+        type:
+          description: Text content part.
+          enum:
+            - text
+          type: string
+      required:
+        - type
+        - text
+      type: object
+    ChatCompletionContentPartRefusal:
+      properties:
+        refusal:
+          description: Refusal message text.
+          type: string
+        type:
+          description: Model refusal content part.
+          enum:
+            - refusal
+          type: string
+      required:
+        - type
+        - refusal
+      type: object
+    FinishReason:
+      description: Why the model stopped generating.
+      enum:
+        - stop
+        - length
+        - tool_calls
+        - content_filter
+        - function_call
+      type: string
+    ToolCall:
+      allOf:
+        - $ref: '#/components/schemas/RawToolCall'
+        - properties:
+            tool_info:
+              $ref: '#/components/schemas/ToolInfo'
+          required:
+            - tool_info
+          type: object
+    ModelMessageUsage:
+      properties:
+        cache_read_tokens:
+          description: Optional cache-read tokens.
+          minimum: 0
+          type: integer
+        cache_write_tokens:
+          description: Optional cache-write tokens.
+          minimum: 0
+          type: integer
+        input_tokens:
+          description: Input tokens for this model call.
+          minimum: 0
+          type: integer
+        input_tokens_breakdown:
+          properties:
+            harness:
+              description: Tokens attributed to harness system framing.
+              minimum: 0
+              type: integer
+            instructions:
+              description: Tokens attributed to agent instructions.
+              minimum: 0
+              type: integer
+            messages:
+              description: Tokens attributed to conversation messages.
+              minimum: 0
+              type: integer
+            skills:
+              description: Tokens attributed to skill instructions.
+              minimum: 0
+              type: integer
+            tool_definitions:
+              description: Tokens attributed to tool schemas.
+              minimum: 0
+              type: integer
+          required:
+            - harness
+            - skills
+            - instructions
+            - tool_definitions
+            - messages
+          type: object
+        output_tokens:
+          description: Output tokens for this model call.
+          minimum: 0
+          type: integer
+      required:
+        - input_tokens
+        - output_tokens
+        - input_tokens_breakdown
+      type: object
+    ExtendedChunkDeltaToolCall:
+      allOf:
+        - $ref: '#/components/schemas/ChatCompletionChunkDeltaToolCall'
+        - properties:
+            provider_specific_fields:
+              additionalProperties: {}
+              type: object
+            tool_info:
+              $ref: '#/components/schemas/ToolInfo'
+          type: object
+    AgentInfo:
+      properties:
+        input:
+          description: Input prompt passed to the subagent.
+          type: string
+        model:
+          description: Optional model override for the subagent.
+          minLength: 1
+          type: string
+        name:
+          description: Display name of the dynamic subagent.
+          type: string
+        type:
+          description: Subagent kind.
+          enum:
+            - dynamic
+          type: string
+      required:
+        - type
+        - name
+        - input
+      type: object
+    AgentParent:
+      properties:
+        thread_id:
+          description: Parent thread that spawned the child agent.
+          type: string
+        tool_call_id:
+          description: Tool call on the parent thread that created the child.
+          type: string
+      required:
+        - thread_id
+        - tool_call_id
+      type: object
+    BaseThreadDoneEvent:
+      properties:
+        parent:
+          $ref: '#/components/schemas/AgentParent'
+        thread_id:
+          description: Thread that finished.
+          type: string
+        title:
+          description: Human-readable thread title.
+          type: string
+      required:
+        - thread_id
+        - title
+      type: object
+    ThreadState:
+      discriminator:
+        mapping:
+          done:
+            $ref: '#/components/schemas/ThreadStateDone'
+          error:
+            $ref: '#/components/schemas/ThreadStateError'
+        propertyName: status
+      oneOf:
+        - $ref: '#/components/schemas/ThreadStateDone'
+        - $ref: '#/components/schemas/ThreadStateError'
+    ToolCallRef:
+      properties:
+        id:
+          description: Tool call id awaiting action.
+          type: string
+        source_event_id:
+          description: Event id of the model.message that requested the tool call.
+          type: string
+      required:
+        - id
+        - source_event_id
+      type: object
+    TurnInputItem:
+      discriminator:
+        mapping:
+          user.message:
+            $ref: '#/components/schemas/UserMessage'
+          user.tool_approval:
+            $ref: '#/components/schemas/UserToolApprovalEvent'
+          user.tool_response:
+            $ref: '#/components/schemas/UserToolResponseEvent'
+        propertyName: type
+      oneOf:
+        - $ref: '#/components/schemas/UserMessage'
+        - $ref: '#/components/schemas/UserToolApprovalEvent'
+        - $ref: '#/components/schemas/UserToolResponseEvent'
+    TurnStateRunning:
+      properties:
+        status:
+          description: Turn is still executing.
+          enum:
+            - running
+          type: string
+      required:
+        - status
+      type: object
+    TurnStateCancelled:
+      properties:
+        completed_at:
+          description: ISO 8601 time when cancellation completed.
+          type: string
+        metrics:
+          allOf:
+            - $ref: '#/components/schemas/TurnMetrics'
+            - description: Optional billable aggregate for work done before cancel.
+        reason:
+          $ref: '#/components/schemas/TurnStateCancelledReason'
+        status:
+          description: Turn was cancelled before completion.
+          enum:
+            - cancelled
+          type: string
+      required:
+        - status
+        - reason
+        - completed_at
+      type: object
+    TurnStateDone:
+      properties:
+        completed_at:
+          description: ISO 8601 time when the turn reached a terminal state.
+          type: string
+        metrics:
+          $ref: '#/components/schemas/TurnMetrics'
+        output:
+          anyOf:
+            - $ref: '#/components/schemas/ModelMessageEvent'
+            - type: 'null'
+          description: >-
+            Final `model.message` for the turn, or null when the turn ended
+            paused without a final message.
+        required_actions:
+          description: >-
+            Pending actions (`tool.approval_required`, `tool.response_required`,
+            `mcp.auth_required`); empty when none.
+          items:
+            $ref: '#/components/schemas/ActionRequiredEvent'
+          type: array
+        status:
+          description: Turn finished (possibly paused for required actions).
+          enum:
+            - done
+          type: string
+      required:
+        - status
+        - output
+        - required_actions
+        - completed_at
+      type: object
+    TurnStateError:
+      properties:
+        completed_at:
+          description: ISO 8601 time when the error state was recorded.
+          type: string
+        message:
+          description: Human-readable error message.
+          type: string
+        metrics:
+          allOf:
+            - $ref: '#/components/schemas/TurnMetrics'
+            - description: Optional billable aggregate for work done before the error.
+        status:
+          description: Turn ended with an error.
+          enum:
+            - error
+          type: string
+      required:
+        - status
+        - message
+        - completed_at
+      type: object
+    RawToolCall:
+      allOf:
+        - $ref: '#/components/schemas/ChatCompletionMessageToolCall'
+        - properties:
+            provider_specific_fields:
+              additionalProperties: {}
+              type: object
+          type: object
+    ToolInfo:
+      discriminator:
+        mapping:
+          mcp:
+            $ref: '#/components/schemas/MCPToolInfo'
+          truefoundry-system:
+            $ref: '#/components/schemas/TrueFoundrySystemToolInfo'
+        propertyName: type
+      oneOf:
+        - $ref: '#/components/schemas/TrueFoundrySystemToolInfo'
+        - $ref: '#/components/schemas/MCPToolInfo'
+    ChatCompletionChunkDeltaToolCall:
+      properties:
+        function:
+          properties:
+            arguments:
+              description: Partial or complete JSON arguments string.
+              type: string
+            name:
+              description: Partial or complete function name.
+              type: string
+          type: object
+        id:
+          description: Tool call id (may arrive across multiple deltas).
+          type: string
+        index:
+          description: Index of this tool call in the streaming delta array.
+          minimum: 0
+          type: integer
+        type:
+          description: Tool call type when present on this delta.
+          enum:
+            - function
+          type: string
+      required:
+        - index
+      type: object
+    ThreadStateDone:
+      properties:
+        output:
+          $ref: '#/components/schemas/ModelMessageEvent'
+        status:
+          description: Thread completed successfully.
+          enum:
+            - done
+          type: string
+      required:
+        - status
+        - output
+      type: object
+    ThreadStateError:
+      properties:
+        error:
+          description: Human-readable error message.
+          type: string
+        output:
+          $ref: '#/components/schemas/ModelMessageEvent'
+        status:
+          description: Thread ended with an error.
+          enum:
+            - error
+          type: string
+      required:
+        - status
+        - error
+      type: object
+    UserMessage:
+      properties:
+        content:
+          anyOf:
+            - type: string
+            - items:
+                $ref: '#/components/schemas/UserMessageContentItem'
+              type: array
+          description: Plain string or structured text/file content parts.
+        type:
+          description: User message input item.
+          enum:
+            - user.message
+          type: string
+      required:
+        - type
+        - content
+      type: object
+    UserToolApprovalEvent:
+      properties:
+        approval:
+          $ref: '#/components/schemas/ApprovalDecision'
+        thread_id:
+          description: Thread that owns the pending tool call.
+          minLength: 1
+          type: string
+        tool_call_id:
+          description: Tool call id being approved or denied.
+          minLength: 1
+          type: string
+        type:
+          description: Client resume after tool.approval_required.
+          enum:
+            - user.tool_approval
+          type: string
+      required:
+        - type
+        - thread_id
+        - tool_call_id
+        - approval
+      type: object
+    UserToolResponseEvent:
+      properties:
+        content:
+          description: Client-side tool result content.
+          minLength: 1
+          type: string
+        thread_id:
+          description: Thread that owns the pending tool call.
+          minLength: 1
+          type: string
+        tool_call_id:
+          description: Tool call id receiving the client response.
+          minLength: 1
+          type: string
+        type:
+          description: Client resume after tool.response_required.
+          enum:
+            - user.tool_response
+          type: string
+      required:
+        - type
+        - thread_id
+        - tool_call_id
+        - content
+      type: object
+    TurnMetrics:
+      description: Optional billable aggregate for the whole turn.
+      properties:
+        total_cache_read_tokens:
+          description: Total cache-read tokens across model calls in this turn.
+          minimum: 0
+          type: integer
+        total_cache_write_tokens:
+          description: Total cache-write tokens across model calls in this turn.
+          minimum: 0
+          type: integer
+        total_cost_in_usd:
+          description: Estimated total cost in USD for this turn.
+          minimum: 0
+          type: number
+        total_input_tokens:
+          description: Total input tokens across model calls in this turn.
+          minimum: 0
+          type: integer
+        total_output_tokens:
+          description: Total output tokens across model calls in this turn.
+          minimum: 0
+          type: integer
+        total_reasoning_tokens:
+          description: Total reasoning tokens across model calls in this turn.
+          minimum: 0
+          type: integer
+        total_tokens:
+          description: Total tokens (input + output) across model calls in this turn.
+          minimum: 0
+          type: integer
+      type: object
+    TurnStateCancelledReason:
+      description: Reason for the cancellation.
+      enum:
+        - server-execution-timeout
+        - client-cancelled
+        - cancelled-for-next-turn
+        - abandoned
+      type: string
+    ActionRequiredEvent:
+      discriminator:
+        mapping:
+          mcp.auth_required:
+            $ref: '#/components/schemas/MCPAuthRequiredEvent'
+          tool.approval_required:
+            $ref: '#/components/schemas/ToolApprovalRequiredEvent'
+          tool.response_required:
+            $ref: '#/components/schemas/ToolResponseRequiredEvent'
+        propertyName: type
+      oneOf:
+        - $ref: '#/components/schemas/ToolApprovalRequiredEvent'
+        - $ref: '#/components/schemas/ToolResponseRequiredEvent'
+        - $ref: '#/components/schemas/MCPAuthRequiredEvent'
+    ChatCompletionMessageToolCall:
+      properties:
+        function:
+          properties:
+            arguments:
+              description: JSON-encoded function arguments string.
+              type: string
+            name:
+              description: Function/tool name.
+              type: string
+          required:
+            - name
+            - arguments
+          type: object
+        id:
+          description: Tool call id.
+          type: string
+        type:
+          description: Tool call type.
+          enum:
+            - function
+          type: string
+      required:
+        - id
+        - type
+        - function
+      type: object
+    MCPToolInfo:
+      properties:
+        name:
+          description: Tool name on the MCP server.
+          type: string
+        server_id:
+          description: Internal MCP server id.
+          type: string
+        server_name:
+          description: Configured MCP server name.
+          type: string
+        type:
+          description: Tool hosted on an MCP server.
+          enum:
+            - mcp
+          type: string
+      required:
+        - type
+        - server_id
+        - server_name
+        - name
+      type: object
+    TrueFoundrySystemToolInfo:
+      properties:
+        name:
+          description: System tool name.
+          type: string
+        type:
+          description: Built-in harness system tool.
+          enum:
+            - truefoundry-system
+          type: string
+      required:
+        - type
+        - name
+      type: object
+    UserMessageContentItem:
+      discriminator:
+        mapping:
+          file:
+            $ref: '#/components/schemas/FileContent'
+          text:
+            $ref: '#/components/schemas/TextContent'
+        propertyName: type
+      oneOf:
+        - $ref: '#/components/schemas/TextContent'
+        - $ref: '#/components/schemas/FileContent'
+    ApprovalDecision:
+      discriminator:
+        mapping:
+          allow:
+            $ref: '#/components/schemas/ApprovalAllow'
+          deny:
+            $ref: '#/components/schemas/ApprovalDeny'
+        propertyName: status
+      oneOf:
+        - $ref: '#/components/schemas/ApprovalAllow'
+        - $ref: '#/components/schemas/ApprovalDeny'
+    FileContent:
+      properties:
+        data:
+          description: >-
+            Data URI: `data:<mime>;base64,<payload>`. MIME type is parsed from
+            the URI.
+          type: string
+        name:
+          description: Filename presented to the agent.
+          type: string
+        type:
+          description: File attachment content part.
+          enum:
+            - file
+          type: string
+      required:
+        - type
+        - name
+        - data
+      type: object
+    TextContent:
+      properties:
+        text:
+          description: Plain-text content.
+          type: string
+        type:
+          description: Text content part.
+          enum:
+            - text
+          type: string
+      required:
+        - type
+        - text
+      type: object
+    ApprovalAllow:
+      properties:
+        status:
+          description: Allow the pending tool call(s).
+          enum:
+            - allow
+          type: string
+      required:
+        - status
+      type: object
+    ApprovalDeny:
+      properties:
+        reason:
+          description: Optional reason shown to the agent when denied.
+          type: string
+        status:
+          description: Deny the pending tool call(s).
+          enum:
+            - deny
+          type: string
+      required:
+        - status
+      type: object
+  securitySchemes:
+    BearerAuth:
+      bearerFormat: JWT
+      description: >-
+        ID token (`Authorization: Bearer <id_token>`). Required on protected
+        routes. Browser sessions may use the HttpOnly `id_token` cookie instead.
+      scheme: bearer
+      type: http
+
+````

@@ -1,0 +1,65 @@
+> ## Documentation Index
+> Fetch the complete documentation index at: https://trueforge.dev/llms.txt
+> Use this file to discover all available pages before exploring further.
+
+# Containers
+
+> Runtime-connected building blocks for custom layouts.
+
+Containers are connected to the chat runtime and take most of their data from context, so they
+need few props. Use them to build a [custom layout](/ui-sdk/guides/layouts).
+
+## Primary
+
+| Export                    | Props                           | Purpose                                                                      |
+| ------------------------- | ------------------------------- | ---------------------------------------------------------------------------- |
+| `Thread`                  | none                            | Convenience wrapper: `<ThreadContainer composer={<ComposerContainer />} />`. |
+| `ThreadContainer`         | `{ composer?: ReactNode }`      | The message transcript with an optional composer slot beneath it.            |
+| `ComposerContainer`       | `{ placeholder?: string }`      | Input, attachments, model label, send/cancel.                                |
+| `ThreadListContainer`     | `{ onThreadOpen?: () => void }` | Session list with new-chat affordance.                                       |
+| `TrueFoundryChatProvider` | see below                       | Mounts the chat runtime.                                                     |
+
+```ts theme={null}
+type TrueFoundryChatProviderProps = {
+  server: AgentUIServer;
+  initialSessionId?: string;
+  adapters?: UseTrueFoundryAgentRuntimeOptions["adapters"];
+  onError?: (error: unknown) => void;
+  children: ReactNode;
+  agent?: TrueFoundryAgentConfig;
+  agentName?: string;
+  listSessionsAgentId?: string;
+};
+```
+
+Use `agent` to select which agent the provider runs; `agentName` is a string-only shorthand kept
+for compatibility. `listSessionsAgentId` is forwarded to `listSessions` to filter the history
+list to a single agent — that is how `TrueForgeUI` scopes the thread list.
+
+## Message and content wiring
+
+`AssistantMessageContainer`, `AssistantTextContainer`, `UserMessageContainer`,
+`UserEditComposerContainer`, `MessageAttachmentsContainer`, `HistoryLoaderContainer`,
+`ReasoningContainer`.
+
+## Tools
+
+`ToolCallContainer`, `ToolCallContentBlockContainer`, `ToolGroupContainer`,
+`ToolApprovalContainer`, `AgentStepsContainer`, `AskUserContainer`.
+
+## Composer attachments
+
+`ComposerAttachmentsContainer`, `ComposerAttachmentPickerContainer`.
+
+## MCP OAuth
+
+`McpAuthContainer`, `PostMcpOauthScreen`.
+
+## Notifications
+
+`ToasterProvider`, `useToaster()`, `useToasterOptional()`.
+
+<Note>
+  The settings panel is part of the built-in layouts and has no standalone container. Custom
+  layouts supply their own, built against the `catalog` server.
+</Note>

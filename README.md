@@ -82,6 +82,8 @@ for await (const { data: event } of stream.withMetadata()) {
 | Sessions that survive reconnects | An NPC keeps its memory across a page refresh |
 | Any model provider | Swap per-NPC: a cheap model for a merchant, a strong one for a boss |
 
+The full harness documentation is vendored at [`docs/trueforge/`](docs/trueforge/) so it is greppable offline and diffable when upstream changes — refresh it with `./scripts/sync-trueforge-docs.sh`.
+
 Configuration lives in YAML catalogs (models, MCP servers, sandbox) and git-backed `SKILL.md` packs — so NPC personas and tool access are version-controlled, reviewable, and diffable rather than hardcoded.
 
 ## The MCP servers we own

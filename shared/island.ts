@@ -193,7 +193,7 @@ const POI_DEFS: { id: string; label: string; x: number; z: number }[] = [
   { id: 'flowerpatch', label: 'the flower patch', x: 23, z: 50.6 },
   { id: 'sfrow', label: 'downtown', x: 62, z: 42 },
   { id: 'gate', label: 'the Golden Gate', x: 42, z: 25.4 },
-  { id: 'irs', label: 'the IRS headquarters', x: 20.6, z: 52 },
+  { id: 'irs', label: 'the startup office', x: 20.6, z: 52 },
 ];
 
 // ── props ───────────────────────────────────────────────────────────────────

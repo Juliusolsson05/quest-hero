@@ -19,6 +19,11 @@ export class IrsEncounter {
   private readonly veil: HTMLDivElement;
   private knocked = false;
   private inArena = false;
+  private fireBtn: HTMLButtonElement | null = null;
+
+  /** Fired entering/leaving the chamber — main hides the other heroes: the
+   *  roast is single-player, whoever else is online. */
+  onSeclusion: (secluded: boolean) => void = () => {};
 
   constructor(
     scene: THREE.Scene,
@@ -32,7 +37,7 @@ export class IrsEncounter {
     this.door = new THREE.Vector3(p.x, p.y, p.z);
 
     this.fight = new BossFight(scene, this.arena, player, {
-      onAudited: () => this.exit('you have been audited. it will happen again', '📋'),
+      onAudited: () => this.exit('Mark: "You are NEVER going to make it as a founder."', '📉'),
       toast,
     });
 
@@ -42,16 +47,27 @@ export class IrsEncounter {
       'position:fixed;inset:0;background:#0b0b12;opacity:0;pointer-events:none;transition:opacity .28s;z-index:40';
     document.body.append(this.veil);
 
-    // Hold Space to return fire — only inside the chamber, so the jump key
-    // keeps meaning jump everywhere else. (You can still hop while firing;
-    // the player's own Space handler runs regardless.)
+    // Hold F to return fire — Space stays the jump, left mouse stays the
+    // camera. Touch devices get a hold-to-FIRE button instead.
     addEventListener('keydown', (e) => {
-      if (e.code !== 'Space' || !this.inArena || document.body.dataset.typing === '1') return;
-      e.preventDefault();
+      if (e.code !== 'KeyF' || !this.inArena || document.body.dataset.typing === '1') return;
       this.fight.setFiring(true);
     });
-    addEventListener('keyup', (e) => { if (e.code === 'Space') this.fight.setFiring(false); });
+    addEventListener('keyup', (e) => { if (e.code === 'KeyF') this.fight.setFiring(false); });
     addEventListener('blur', () => this.fight.setFiring(false));
+
+    if (matchMedia('(pointer: coarse)').matches) {
+      this.fireBtn = document.createElement('button');
+      this.fireBtn.textContent = 'FIRE';
+      this.fireBtn.style.cssText =
+        'position:fixed;right:18px;bottom:132px;width:78px;height:78px;border-radius:50%;z-index:30;' +
+        'display:none;border:3px solid #fffdf6;background:#e4574f;color:#fffdf6;' +
+        'font:900 17px "Baloo 2",system-ui;box-shadow:0 4px 0 rgba(53,49,63,.3);touch-action:none;';
+      document.body.append(this.fireBtn);
+      this.fireBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); this.fight.setFiring(true); });
+      for (const ev of ['pointerup', 'pointercancel', 'pointerleave'] as const)
+        this.fireBtn.addEventListener(ev, () => this.fight.setFiring(false));
+    }
   }
 
   private nearDoor(): boolean {
@@ -69,8 +85,10 @@ export class IrsEncounter {
       this.arena.group.visible = true;
       this.player.setArena(IRS_ARENA.bounds);
       this.player.teleport(new THREE.Vector3(IRS_ARENA.entrance.x, IRS_ARENA.floorY, IRS_ARENA.entrance.z));
-      this.player.setYaw(0); // walk in facing IRS Mark, not the door you came through
+      this.player.setYaw(0); // walk in facing Mark, not the door you came through
       this.fight.begin();
+      this.onSeclusion(true);
+      if (this.fireBtn) this.fireBtn.style.display = 'block';
     });
   }
 
@@ -83,6 +101,8 @@ export class IrsEncounter {
       this.knocked = false;
       this.player.setArena(null);
       this.player.teleport(new THREE.Vector3(this.door.x + 0.8, this.door.y, this.door.z));
+      this.onSeclusion(false);
+      if (this.fireBtn) this.fireBtn.style.display = 'none';
       this.toast(line, icon);
     });
   }
@@ -90,11 +110,11 @@ export class IrsEncounter {
   /** Interactable surface: what the pill should read here, or null. */
   prompt(): string | null {
     if (this.inArena) {
-      if (this.arena.nearExit(this.player.pos)) return `<kbd>E</kbd> leave before the audit 🚪`;
-      return this.fight.active ? `hold <kbd>Space</kbd> to return fire 🔫` : null;
+      // no firing hint — the gun explains itself
+      return this.arena.nearExit(this.player.pos) ? `<kbd>E</kbd> leave before the roast 🚪` : null;
     }
     if (this.nearDoor()) {
-      return this.knocked ? `<kbd>E</kbd> meet the taxcollector 🧾` : `<kbd>E</kbd> knock on the IRS door 🚪`;
+      return this.knocked ? `<kbd>E</kbd> meet Mark the startup enemy 🥊` : `<kbd>E</kbd> knock on the startup office door 🚪`;
     }
     return null;
   }
@@ -103,13 +123,13 @@ export class IrsEncounter {
    *  through to city interactions, even away from the exit. */
   act(): boolean {
     if (this.inArena) {
-      if (this.arena.nearExit(this.player.pos)) this.exit('you step back into the sunlight. unaudited. for now', '🌤️');
+      if (this.arena.nearExit(this.player.pos)) this.exit('you step back into the sunlight. still a founder', '🌤️');
       return true;
     }
     if (!this.nearDoor()) return false;
     if (!this.knocked) {
       this.knocked = true;
-      this.toast('a voice from inside: "COME IN. BRING RECEIPTS."', '🧾');
+      this.toast('a voice from inside: "COME IN. BRING YOUR PITCH DECK."', '🥊');
     } else this.enter();
     return true;
   }

@@ -71,6 +71,10 @@ function nameSprite(name: string, tint: string): THREE.Sprite {
 }
 
 export class Multiplayer {
+  /** The boss fight is single-player: while false, remote heroes vanish
+   *  (scene and minimap both) even though the room stays connected. */
+  avatarsVisible = true;
+
   private ready = false;
   private readonly remotes = new Map<string, Remote>();
   status: 'connecting' | 'online' | 'solo' = 'connecting';
@@ -160,6 +164,7 @@ export class Multiplayer {
   update(dt: number): void {
     const k = Math.min(1, dt * 10);
     for (const r of this.remotes.values()) {
+      if (!this.avatarsVisible) { r.view.root.visible = false; continue; }
       let pose: MpPose | null = null;
       try { pose = (r.p.getState('pose') as MpPose) ?? null; } catch { /* noop */ }
       if (!pose || typeof pose.x !== 'number') continue;

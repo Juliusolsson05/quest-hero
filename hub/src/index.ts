@@ -12,10 +12,10 @@ import type { ClientFrame, ServerFrame } from '../../shared/protocol';
 import { mountApi } from './api';
 import { startChatter } from './chatter';
 import { CONFIG } from './config';
-import { talk } from './dialogue';
+import { registerAgents, talk } from './dialogue';
 import { startIngest } from './ingest';
 import { island } from '../../shared/island';
-import { startSim } from './sim';
+import { engagePlayer, startSim } from './sim';
 import {
   acceptQuest,
   getPlayer,
@@ -75,7 +75,10 @@ wss.on('connection', (ws) => {
           if (frame.action === 'accept') acceptQuest(frame.id);
           break;
         case 'interact':
-          break; // proximity interactions resolve through talk/goto tracking
+          // The player opened (or is keeping open) a conversation: the NPC
+          // stops and faces them. Non-NPC targets are a harmless no-op.
+          engagePlayer(frame.targetId);
+          break;
       }
     } catch (e) {
       console.warn('[ws] frame handling failed:', e instanceof Error ? e.message : e);
@@ -94,4 +97,6 @@ server.listen(CONFIG.port, () => {
   startSim();
   startIngest();
   startChatter();
+  // Every villager becomes a named agent in the TrueForge Agent Library.
+  void registerAgents();
 });

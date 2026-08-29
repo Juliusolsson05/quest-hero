@@ -19,3 +19,16 @@ export function esc(s: string): string {
   d.textContent = s;
   return d.innerHTML;
 }
+
+// ── citizen labels ─────────────────────────────────────────────────────────
+// "Blacksmith · Bran", "Venture Capitalist · Chad" — the profession leads
+// wherever a citizen's name is shown (bubbles, talk bar, prompts, the city
+// pulse), so who you're dealing with reads at a glance.
+
+export function roleTitle(role: string): string {
+  return role.replace(/(^|\s)\S/g, (c) => c.toUpperCase());
+}
+
+export function npcLabel(n: { name: string; role: string }): string {
+  return `${roleTitle(n.role)} · ${n.name}`;
+}

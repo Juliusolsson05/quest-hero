@@ -7,6 +7,7 @@ import type { Atmosphere } from './fx';
 import { Net } from './net';
 import type { Player } from './player';
 import type { Ui } from './ui';
+import { npcLabel } from './util';
 
 /**
  * The hub link — the ONLY file that owns the WebSocket and interprets
@@ -49,6 +50,20 @@ export class HubLink {
       feed.addTalk('you', '#e8f7ee', text);
     };
     ui.onAccept = (id) => this.net.send({ t: 'quest', id, action: 'accept' });
+
+    // Conversation hold keep-alive: while the talk bar is open, re-send
+    // `interact` every 5s so the hub's ~12s hold slides forward and the NPC
+    // stands facing the player instead of wandering off mid-chat.
+    setInterval(() => {
+      const who = ui.talking;
+      if (who) this.net.send({ t: 'interact', targetId: who });
+    }, 5000);
+  }
+
+  /** The player opened a conversation: tell the hub so the NPC stops and
+   *  faces them (the sim's engagePlayer hold). */
+  interact(targetId: string): void {
+    this.net.send({ t: 'interact', targetId });
   }
 
   private pushQuests(): void {
@@ -87,9 +102,9 @@ export class HubLink {
       case 'pose': entities.applyPose(f); break;
       case 'bubble': {
         const npc = entities.npc(f.who)?.data;
-        bubbles.push(f.who, npc?.name ?? f.who, npc?.bubbleTint ?? '#fffdf6', f.mode, f.text, f.emotion);
+        bubbles.push(f.who, npc ? npcLabel(npc) : f.who, npc?.bubbleTint ?? '#fffdf6', f.mode, f.text, f.emotion);
         if (f.mode !== 'thinking' && f.mode !== 'tool') {
-          feed.addTalk(npc?.name ?? f.who, npc?.bubbleTint ?? '#fffdf6', f.text);
+          feed.addTalk(npc ? npcLabel(npc) : f.who, npc?.bubbleTint ?? '#fffdf6', f.text);
         }
         break;
       }

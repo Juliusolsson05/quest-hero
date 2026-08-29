@@ -8,7 +8,7 @@ import type { Quest, QuestStep } from '../../shared/protocol';
 import { POI_IDS } from '../../shared/island';
 import { NPC_IDS } from './npcs';
 import { addQuest } from './state';
-import { sessionFor, streamTurn, type SessionSpec } from './trueforge';
+import { type AgentDef, sessionFor, streamTurn, userMessage } from './trueforge';
 import { clamp, nextId, warnOnce } from './util';
 
 // ── quest step validation (shared with POST /api/quests) ────────────────────
@@ -37,7 +37,13 @@ export function validateSteps(input: unknown): QuestStep[] | null {
 
 // ── Quest Scribe ────────────────────────────────────────────────────────────
 
-const SCRIBE_SPEC: SessionSpec = {
+/** A named JSON-mode agent (response_format json_object) in the Agent
+ *  Library; registered at boot by dialogue.ts's registerAgents. */
+export const SCRIBE_DEF: AgentDef = {
+  registryName: 'ashford-quest-scribe',
+  model: 'openai/gpt-5-5',
+  json: true,
+  subagents: false, // one headline in, one quest out — no fan-out needed
   persona:
     'You are the Quest Scribe of Ashford, a cozy kawaii village game. Given one real news ' +
     'headline, turn it into one tiny village quest. Reply with STRICT JSON only — no prose, ' +
@@ -47,7 +53,6 @@ const SCRIBE_SPEC: SessionSpec = {
     '{"kind":"goto","target":"<poi>","text":string}], "reward":{"coins": number between 5 and 20}}. ' +
     'Allowed talk targets: bran, wren, suki. Allowed goto targets: plaza, forge, market, farm, ' +
     'docks, hill, board, mailbox, pen, flowerpatch. JSON only.',
-  model: 'openai/gpt-5-5',
 };
 
 function parseScribe(raw: string, url: string): Quest | null {
@@ -95,17 +100,14 @@ function templateQuest(headline: string, url: string): Quest {
 }
 
 async function scribeTurn(sid: string, content: string, url: string): Promise<Quest | null> {
-  let acc = '';
   const ctrl = new AbortController();
   let wd = setTimeout(() => ctrl.abort(), 20_000);
   try {
-    await streamTurn(
+    const result = await streamTurn(
       sid,
-      content,
+      userMessage(content),
       {
-        onDelta: (c) => {
-          acc += c;
-        },
+        onDelta: () => {},
         onActivity: () => {
           clearTimeout(wd);
           wd = setTimeout(() => ctrl.abort(), 20_000);
@@ -113,10 +115,10 @@ async function scribeTurn(sid: string, content: string, url: string): Promise<Qu
       },
       ctrl.signal,
     );
+    return parseScribe(result.text, url);
   } finally {
     clearTimeout(wd);
   }
-  return parseScribe(acc, url);
 }
 
 /**
@@ -125,7 +127,7 @@ async function scribeTurn(sid: string, content: string, url: string): Promise<Qu
  */
 export async function scribeQuest(headline: string, url: string): Promise<Quest | null> {
   try {
-    const sid = await sessionFor('quest-scribe', SCRIBE_SPEC, AbortSignal.timeout(8_000));
+    const sid = await sessionFor('quest-scribe', SCRIBE_DEF, AbortSignal.timeout(10_000));
     let quest = await scribeTurn(sid, `Headline: "${headline}" (${url})`, url);
     quest ??= await scribeTurn(sid, 'That was not valid JSON matching the schema. Reply again with ONLY the JSON object.', url);
     if (!quest) {

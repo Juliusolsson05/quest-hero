@@ -19,6 +19,7 @@ import { Player } from './player';
 import { initProps3d } from './props3d';
 import { TouchControls } from './touch';
 import { Ui } from './ui';
+import { npcLabel, roleTitle } from './util';
 import { WaterFx } from './water-fx';
 import { buildIsland, IslandView } from './world';
 
@@ -126,7 +127,6 @@ const irs = new IrsEncounter(scene, generatedIsland, player, toast);
 irs.onSeclusion = (secluded) => { mp.avatarsVisible = !secluded; };
 
 const hub = new HubLink({ player, entities, ui, fx, bubbles, feed, cartly });
-void hub; // lives for the whole run; every hub effect arrives through its wiring
 
 if (import.meta.env.DEV) { // console-inspection only — never shipped
   (window as unknown as Record<string, unknown>).__sfq = { island, player, mp, cartly, irs };
@@ -140,12 +140,13 @@ const interactables: Interactable[] = [
   { // talk to the nearest citizen
     prompt: () => {
       const npc = entities.nearestNpc(player.pos, 3.4);
-      return npc ? `<kbd>E</kbd> talk to ${npc.name} 💬` : null;
+      return npc ? `<kbd>E</kbd> talk to ${roleTitle(npc.role)} ${npc.name} 💬` : null;
     },
     act: () => {
       const npc = entities.nearestNpc(player.pos, 3.4);
       if (!npc) return false;
-      ui.openTalk(npc.id, `${npc.name} · ${npc.role}`);
+      ui.openTalk(npc.id, npcLabel(npc));
+      hub.interact(npc.id); // the NPC stops and faces the player
       return true;
     },
   },

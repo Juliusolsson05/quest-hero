@@ -201,9 +201,11 @@ void loadManifest();
 
 const playerAnchor = new THREE.Vector3();
 const clock = new THREE.Clock();
+let mmAcc = 0;
+const sizeProbe = new THREE.Vector2();
 renderer.setAnimationLoop(() => {
   // Some hosts (emulated viewports, panes) never fire `resize` — poll instead.
-  const size = renderer.getSize(new THREE.Vector2());
+  const size = renderer.getSize(sizeProbe);
   if (size.x !== innerWidth || size.y !== innerHeight) {
     player.camera.aspect = innerWidth / innerHeight;
     player.camera.updateProjectionMatrix();
@@ -221,15 +223,19 @@ renderer.setAnimationLoop(() => {
   fx.update(dt, player.camera);
   irs.update(dt);
 
-  minimap.update(
-    { x: player.pos.x, z: player.pos.z, rot: player.rot },
-    entities.npcList().map((n) => {
-      const e = entities.npc(n.id)!;
-      return { x: e.view.root.position.x, z: e.view.root.position.z, color: n.bubbleTint || '#ffd3b6' };
-    }),
-    cartly.cartPos ? { x: cartly.cartPos.x, z: cartly.cartPos.z, color: '#ffd977' } : null,
-    mp.dots(),
-  );
+  mmAcc += dt;
+  if (mmAcc > 0.1) { // 10Hz redraw — a full-canvas repaint per frame is waste
+    mmAcc = 0;
+    minimap.update(
+      { x: player.pos.x, z: player.pos.z, rot: player.rot },
+      entities.npcList().map((n) => {
+        const e = entities.npc(n.id)!;
+        return { x: e.view.root.position.x, z: e.view.root.position.z, color: n.bubbleTint || '#ffd3b6' };
+      }),
+      cartly.cartPos ? { x: cartly.cartPos.x, z: cartly.cartPos.z, color: '#ffd977' } : null,
+      mp.dots(),
+    );
+  }
 
   // Interaction prompt: the first interactable with something to say wins.
   if (document.body.dataset.typing !== '1') {

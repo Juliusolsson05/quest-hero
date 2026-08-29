@@ -17,6 +17,7 @@ import { Minimap } from './minimap';
 import { Multiplayer } from './mp';
 import { Player } from './player';
 import { initProps3d } from './props3d';
+import { StartScreen } from './start';
 import { TouchControls } from './touch';
 import { Ui } from './ui';
 import { WaterFx } from './water-fx';
@@ -49,6 +50,9 @@ const ui = new Ui();
 const feed = new CityFeed();
 const minimap = new Minimap();
 new TouchControls(player); // joystick + compact chrome on coarse-pointer devices
+// A lid, not a gate: everything above already renders behind it from the
+// first frame, so the bar below reports asset streaming, not readiness.
+const start = new StartScreen(COARSE);
 
 // ── multiplayer (worldplay4's Playroom stack): the URL is the invite link ──
 const mp = new Multiplayer(scene);
@@ -63,6 +67,7 @@ inviteChip.addEventListener('click', () => {
 mp.onStatus = (status, room) => {
   inviteChip.textContent = status === 'online' ? `🔗 ${room ?? 'room'} · invite` : '🔗 solo';
   if (status === 'online') ui.toast('multiplayer on — click 🔗 to copy the invite link', '🎮');
+  start.paintQr(); // the room code is in the URL now, so the QR must be re-cut
 };
 let mpCount = 0;
 mp.onRoster = (names) => {
@@ -86,12 +91,14 @@ composer.addPass(new OutputPass());
 // (shared/island.ts), so the client builds it immediately — the game works on
 // a static host with no hub (Playroom heroes only, citizens asleep), and the
 // hub, when reachable, animates NPCs/weather/quests on top.
+let propsReady: Promise<void>;
 const island: IslandView = new IslandView(generatedIsland);
 {
   const built = buildIsland(generatedIsland);
   scene.add(built.group);
   fx.attachWorld(built);
-  initProps3d(scene, island); // Tripo kawaii props + the parked fleet
+  propsReady = initProps3d(scene, island, // Tripo kawaii props + the parked fleet
+    (done, total) => start.setProgress(done / total));
   // The painted distance: rocks, headlands, a skyline — so the eye never
   // finds the edge of the tile grid.
   const far = buildDistance(new THREE.Vector3(generatedIsland.size / 2, 0, generatedIsland.size / 2));
@@ -183,14 +190,6 @@ addEventListener('keydown', (e) => {
   if (e.code === 'KeyE') interact();
 });
 
-const startEl = document.getElementById('start')!;
-startEl.addEventListener('pointerdown', () => startEl.classList.add('hidden')); // tap or click
-if (COARSE) {
-  startEl.querySelector('.keys')!.textContent =
-    'left stick to stroll (push far to run) · drag to look · pinch to zoom · tap the pill to talk';
-  startEl.querySelector('.go')!.textContent = 'tap to step off the cable car ✨';
-}
-
 addEventListener('resize', () => {
   player.camera.aspect = innerWidth / innerHeight;
   player.camera.updateProjectionMatrix();
@@ -198,7 +197,10 @@ addEventListener('resize', () => {
   composer.setSize(innerWidth, innerHeight);
 });
 
-void loadManifest();
+// LOADING → START once the wardrobe and the props are in; the floor is there
+// so a stalled CDN can never park the button on LOADING.
+void Promise.all([loadManifest(), propsReady!]).then(() => start.ready());
+setTimeout(() => start.ready(), 9000);
 
 const playerAnchor = new THREE.Vector3();
 const clock = new THREE.Clock();

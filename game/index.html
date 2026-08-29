@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <title>SF Quest</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&display=swap" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Titan+One&display=swap" />
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
       body { overflow: hidden; background: #bfe6f7; color: #35313f;
@@ -237,30 +237,293 @@
       body.touch .ph-screen { height: min(592px, 68vh); }
       body.touch #talkbar { bottom: 2.5vh; }
 
-      /* start overlay */
-      #start { position: fixed; inset: 0; display: grid; place-content: center; gap: 12px; text-align: center;
-               background: linear-gradient(180deg, #bfe6f7 0%, #ffe9d2 78%, #ffd9d5 100%); cursor: pointer; z-index: 40; }
-      #start h1 { font-size: 54px; font-weight: 800; letter-spacing: -.01em; color: #35313f;
-                  text-shadow: 0 4px 0 rgba(255,255,255,.6); }
-      #start .sub { font-weight: 700; color: #7a6f85; }
-      #start .keys { color: #8d8496; font-weight: 600; font-size: 14px; }
-      #start .go { margin-top: 8px; font-weight: 800; color: #e2574f; animation: pulse 1.6s infinite; }
+      /* ══ start / title screen ═══════════════════════════════════════════
+         The game boots and renders behind this the whole time; the overlay is
+         just a lid. Layer order: .zoom (the dive, its origin pinned to the
+         button) → .veil (art + UI, and the pill-shaped hole punched out of it)
+         alongside .doors (the two leaves sitting over that hole).
+         See src/start.ts for the launch sequence. */
+      #start { position: fixed; inset: 0; z-index: 40; cursor: pointer; overflow: hidden; }
       #start.hidden { display: none; }
-      @keyframes pulse { 50% { opacity: .5; } }
-      @media (max-width: 480px) {
-        #start { padding: 0 18px; }
-        #start h1 { font-size: 40px; }
+      #start .zoom, #start .veil { position: absolute; inset: 0; }
+      /* The sky lives on .veil, not on #start: the doorway is a hole punched out
+         of .veil, and anything painted behind it would show through instead of
+         the running game. */
+      #start .veil { background: linear-gradient(180deg, #9ed9f4 0%, #cfe9ef 42%, #ffe9d2 78%, #ffd9d5 100%); }
+
+      /* the wallpaper */
+      #start .bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+                   object-position: 50% 58%; filter: saturate(1.14) contrast(1.03) brightness(1.02);
+                   opacity: 0; transition: opacity .7s ease; }
+      #start .bg.in { opacity: 1; }
+      /* binds the art to the game palette and keeps the middle clean for the logo */
+      #start .tint { position: absolute; inset: 0; mix-blend-mode: soft-light;
+                     background: linear-gradient(180deg, rgba(191,230,247,.55) 0%, rgba(255,233,210,.18) 46%,
+                                                 rgba(255,170,165,.5) 100%); }
+      #start .vig { position: absolute; inset: 0;
+                    background: radial-gradient(ellipse 78% 66% at 50% 40%, rgba(255,253,246,.34) 0%,
+                                rgba(255,253,246,0) 58%, rgba(53,49,63,.16) 100%); }
+
+      /* drifting fog + twinkles, the bits the still image can't do */
+      #start .fog { position: absolute; left: 0; width: 46%; height: clamp(72px, 15vh, 190px);
+                    pointer-events: none; opacity: 0; filter: blur(7px);
+                    background: radial-gradient(closest-side, rgba(255,255,255,.92),
+                                rgba(255,255,255,.45) 48%, rgba(255,255,255,0) 100%); }
+      #start .fog-a { bottom: 27%; animation: fog-a 27s linear infinite; }
+      #start .fog-b { bottom: 15%; width: 58%; animation: fog-b 38s linear infinite 6s; }
+      @keyframes fog-a { 0% { transform: translateX(-60%); opacity: 0; }
+                         20%, 72% { opacity: .55; } 100% { transform: translateX(230%); opacity: 0; } }
+      @keyframes fog-b { 0% { transform: translateX(200%); opacity: 0; }
+                         22%, 74% { opacity: .42; } 100% { transform: translateX(-90%); opacity: 0; } }
+      #start .st { position: absolute; width: clamp(12px, 1.8vw, 26px); pointer-events: none;
+                   animation: twinkle 3.2s ease-in-out infinite; }
+      #start .st-1 { top: 13%; left: 30%; }
+      #start .st-2 { top: 8%;  right: 21%; animation-delay: .9s; }
+      #start .st-3 { top: 30%; left: 12%; animation-delay: 1.7s; }
+      #start .st-4 { top: 22%; right: 33%; animation-delay: .4s; }
+      #start .st-5 { top: 41%; right: 9%;  animation-delay: 2.3s; }
+      @keyframes twinkle { 0%, 100% { opacity: .95; transform: scale(1) rotate(0deg); }
+                           50% { opacity: .2; transform: scale(.55) rotate(45deg); } }
+
+      /* light pooled behind the logo so it reads over whatever is under it */
+      #start .halo { position: absolute; left: 50%; top: 43%; transform: translate(-50%, -50%);
+                     width: min(1120px, 128vw); height: min(660px, 80vh); pointer-events: none;
+                     background: radial-gradient(closest-side, rgba(255,253,246,.6),
+                                 rgba(255,253,246,.22) 52%, rgba(255,253,246,0) 76%); }
+
+      /* ── content stack ── */
+      #start .stack { position: absolute; inset: 0; display: flex; flex-direction: column;
+                      align-items: center; justify-content: center; gap: 13px; text-align: center; padding: 20px; }
+      #start .badge { display: inline-flex; align-items: center; gap: 7px; background: rgba(255,253,246,.94);
+                      border: 2.5px solid #35313f; border-radius: 999px; padding: 4px 17px; font-weight: 800;
+                      font-size: 12.5px; letter-spacing: .17em; text-transform: uppercase;
+                      box-shadow: 0 4px 0 rgba(53,49,63,.16); }
+      #start .wordmark { display: block; width: min(830px, 93vw); height: auto; margin: -2px 0 2px; }
+      #start .wordmark .shine { animation: shine 4.6s cubic-bezier(.55,0,.45,1) infinite; }
+      @keyframes shine { 0%, 64% { transform: translateX(-300px); } 100% { transform: translateX(1180px); } }
+      #start .wordmark .pop { animation: twinkle 2.4s ease-in-out infinite;
+                              transform-box: fill-box; transform-origin: center; }
+      #start .wordmark .pop2 { animation-delay: 1.1s; }
+      #start .wordmark .pop3 { animation-delay: .55s; }
+
+      #start .sub { font-weight: 700; font-size: 17px; color: #5f5569;
+                    text-shadow: 0 2px 0 rgba(255,253,246,.85); }
+      #start .keys { color: #6d6577; font-weight: 700; font-size: 13.5px; max-width: 800px;
+                     background: rgba(255,253,246,.72); border-radius: 999px; padding: 6px 18px; }
+
+      /* ── the start button, which is also the door ── */
+      #start .go-btn { position: relative; margin-top: 8px; display: inline-flex; align-items: center;
+                       justify-content: center; gap: 11px; border-radius: 999px; padding: 14px 44px 16px;
+                       font: 400 25px/1 "Titan One", "Baloo 2", sans-serif; letter-spacing: .1em;
+                       color: #fffdf6; box-shadow: 0 7px 0 rgba(53,49,63,.3), 0 16px 28px rgba(53,49,63,.22);
+                       animation: hop 2.8s ease-in-out infinite; }
+      /* two leaves, so the face can split open later */
+      #start .leaf, #start .dl, #start .dr { position: absolute; top: 0; height: 100%; width: 50.4%;
+                       border: 3px solid #35313f;
+                       background: linear-gradient(180deg, #ff8b78 0%, #e2574f 50%, #c4434c 100%); }
+      #start .leaf.ll, #start .dl { left: 0; border-radius: 999px 0 0 999px; border-right: none; }
+      #start .leaf.lr, #start .dr { right: 0; border-radius: 0 999px 999px 0; border-left: none; }
+      /* the seam, and the Y2K gloss across the top of the pill */
+      #start .go-btn::before { content: ""; position: absolute; left: 50%; top: 3px; bottom: 3px; width: 2px;
+                               margin-left: -1px; background: rgba(53,49,63,.28); z-index: 1; border-radius: 2px; }
+      #start .go-btn::after { content: ""; position: absolute; left: 9px; right: 9px; top: 4px; height: 44%;
+                              border-radius: 999px; z-index: 1; pointer-events: none;
+                              background: linear-gradient(180deg, rgba(255,255,255,.6), rgba(255,255,255,0)); }
+      #start .lbl { position: relative; z-index: 2; display: inline-flex; align-items: center; gap: 10px;
+                    text-shadow: 0 2px 0 rgba(53,49,63,.38); transition: opacity .18s, transform .18s; }
+      #start:hover .go-btn { transform: translateY(-2px); }
+      #start:active .go-btn { transform: translateY(5px); box-shadow: 0 2px 0 rgba(53,49,63,.3); animation: none; }
+      @keyframes hop { 0%, 86%, 100% { transform: translateY(0); } 93% { transform: translateY(-5px); } }
+
+      /* loading bar under the button while the city streams in */
+      #start .bar { position: absolute; left: 14%; right: 14%; bottom: -14px; height: 6px; z-index: 2;
+                    background: rgba(53,49,63,.16); border-radius: 999px; overflow: hidden;
+                    transition: opacity .4s; }
+      #start .bar i { display: block; height: 100%; width: 0%; border-radius: 999px; background: #fffdf6;
+                      box-shadow: 0 0 8px rgba(255,253,246,.9); transition: width .3s ease; }
+      #start .go-btn.ready .bar { opacity: 0; }
+      #start .go-btn.ready { animation: hop 2.8s ease-in-out infinite, pop-in .5s cubic-bezier(.34,1.7,.5,1); }
+      @keyframes pop-in { 0% { transform: scale(1); } 40% { transform: scale(1.11); } 100% { transform: scale(1); } }
+
+      #start .go { margin-top: 10px; font-weight: 800; font-size: 14px; color: #b8455f;
+                   letter-spacing: .03em; background: rgba(255,253,246,.72); border-radius: 999px;
+                   padding: 4px 16px; animation: pulse 1.8s infinite; }
+      @keyframes pulse { 50% { opacity: .45; } }
+
+      /* ── QR: hand the city to a phone ── */
+      #start .qr { position: absolute; right: 22px; bottom: 20px; z-index: 3; cursor: copy;
+                   display: flex; align-items: center; gap: 11px; padding: 11px 15px 11px 11px;
+                   background: rgba(255,253,246,.94); border: 2.5px solid #35313f; border-radius: 18px;
+                   box-shadow: 0 5px 0 rgba(53,49,63,.18); transition: transform .16s; }
+      #start .qr:hover { transform: translateY(-2px) rotate(-1deg); }
+      #start .qr:active { transform: translateY(2px); box-shadow: none; }
+      #start .qr svg { display: block; width: 74px; height: 74px; border-radius: 7px; }
+      #start .qr-t { text-align: left; font-weight: 700; font-size: 11.5px; color: #7a7185;
+                     line-height: 1.35; white-space: nowrap; }
+      #start .qr-t b { display: block; font-weight: 800; font-size: 13.5px; color: #35313f; }
+      #start .qr-t i { font-style: normal; color: #b8455f; font-weight: 800; }
+
+      /* ── the doors: a clone of the button face, pinned over the hole ── */
+      /* The doors must be pixel-identical to the button face at rest — same
+         gradient, same gloss, same seam — or the swap at t=0 reads as a flicker. */
+      #start .doors { position: absolute; display: none; border-radius: 999px; overflow: hidden;
+                      box-shadow: 0 7px 0 rgba(53,49,63,.3), 0 16px 28px rgba(53,49,63,.22); }
+      #start.launching .doors { display: block; }
+      #start .doors::before { content: ""; position: absolute; left: 50%; top: 3px; bottom: 3px; width: 2px;
+                              margin-left: -1px; background: rgba(53,49,63,.28); border-radius: 2px; z-index: 1; }
+      #start .dl::after, #start .dr::after { content: ""; position: absolute; left: 7px; right: 7px; top: 4px;
+                              height: 44%; border-radius: 999px; pointer-events: none;
+                              background: linear-gradient(180deg, rgba(255,255,255,.6), rgba(255,255,255,0)); }
+      #start .dl, #start .dr { will-change: transform; }
+      /* the light behind the doors, seen through the widening gap */
+      #start .dglow { position: absolute; inset: 0; opacity: 0; border-radius: 999px;
+                      background: radial-gradient(closest-side, rgba(255,253,246,.95),
+                                  rgba(255,253,246,.55) 55%, rgba(255,253,246,0) 100%); }
+
+      /* Leaving is one gesture: the doors part, and the whole overlay falls into
+         the gap. Every curve is single-direction — no overshoot, no shake, no
+         squash — so nothing reads as a wobble at speed. */
+      #start.launching { cursor: default; }
+      #start.launching .go-btn { animation: none; }
+      #start.launching .badge, #start.launching .sub, #start.launching .keys,
+      #start.launching .go, #start.launching .qr { animation: dissolve .24s ease-out forwards; }
+      #start.launching .wordmark { animation: dissolve .34s .1s ease-out forwards; }
+      #start.launching .doors::before { animation: dissolve .14s .12s ease-out forwards; }
+      #start.launching .dl { animation: part-l .46s .12s cubic-bezier(.4,0,.2,1) forwards; }
+      #start.launching .dr { animation: part-r .46s .12s cubic-bezier(.4,0,.2,1) forwards; }
+      #start.launching .dglow { animation: spill .42s .12s ease-out forwards; }
+      #start.launching .zoom { animation: dive .95s .3s cubic-bezier(.55,0,.85,.42) forwards; }
+      @keyframes part-l { 0% { transform: translateX(0); opacity: 1; }
+                          62% { opacity: 1; } 100% { transform: translateX(-101%); opacity: 0; } }
+      @keyframes part-r { 0% { transform: translateX(0); opacity: 1; }
+                          62% { opacity: 1; } 100% { transform: translateX(101%); opacity: 0; } }
+      @keyframes spill { 0% { opacity: 0; } 22% { opacity: .58; } 100% { opacity: 0; } }
+      @keyframes dissolve { to { opacity: 0; } }
+      @keyframes dive { 0% { transform: scale(1); opacity: 1; }
+                        74% { opacity: 1; } 100% { transform: scale(24); opacity: 0; } }
+
+      @media (max-width: 640px) {
+        #start .bg { object-position: 42% 58%; }
+        #start .stack { gap: 10px; padding: 16px; justify-content: center; }
+        #start .wordmark { width: 92vw; }
+        #start .badge { font-size: 10.5px; padding: 3px 13px; letter-spacing: .14em; }
         #start .sub { font-size: 14px; }
-        #start .keys { font-size: 12.5px; }
+        #start .keys { font-size: 12px; padding: 5px 14px; }
+        #start .go-btn { font-size: 20px; padding: 12px 34px 14px; }
+        #start .go { font-size: 12.5px; }
+        #start .qr { right: 50%; transform: translateX(50%); bottom: 14px; padding: 8px 12px 8px 8px; gap: 9px; }
+        #start .qr:hover, #start .qr:active { transform: translateX(50%); }
+        #start .qr svg { width: 62px; height: 62px; }
+        #start .qr-t { font-size: 10.5px; } #start .qr-t b { font-size: 12px; }
+        /* the halo is sized off the viewport — on a phone it swallowed the art */
+        #start .halo { top: 42%; width: min(680px, 112vw); height: min(500px, 54vh);
+                       background: radial-gradient(closest-side, rgba(255,253,246,.5),
+                                   rgba(255,253,246,.18) 54%, rgba(255,253,246,0) 78%); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #start .fog, #start .st, #start .wordmark .shine, #start .wordmark .pop,
+        #start .go-btn, #start .go { animation: none; }
+        #start .fog { opacity: .4; }
+        #start.launching .zoom { animation: dissolve .45s .1s ease-out forwards; }
+        #start.launching .dl, #start.launching .dr, #start.launching .dglow { animation: none; }
       }
     </style>
   </head>
   <body>
     <div id="start">
-      <h1>🌉 SF Quest</h1>
-      <div class="sub">a tiny San Francisco that lives on real data — bring a friend, the link is the invite</div>
-      <div class="keys">WASD move · Shift run · <kbd>Space</kbd> jump · drag to look · wheel zoom · <kbd>E</kbd> talk / read · <kbd>P</kbd> phone · <kbd>L</kbd> city pulse</div>
-      <div class="go">click to step off the cable car ✨</div>
+      <div class="zoom">
+        <div class="veil">
+          <img class="bg" id="startbg" src="/art/city.webp" alt="" decoding="async" fetchpriority="high" />
+          <div class="tint"></div>
+          <div class="vig"></div>
+          <div class="fog fog-a"></div>
+          <div class="fog fog-b"></div>
+          <svg class="st st-1" viewBox="0 0 44 44" aria-hidden="true"><path d="M22 0Q26 18 44 22 26 26 22 44 18 26 0 22 18 18 22 0Z" fill="#fffdf6"/></svg>
+          <svg class="st st-2" viewBox="0 0 44 44" aria-hidden="true"><path d="M22 0Q26 18 44 22 26 26 22 44 18 26 0 22 18 18 22 0Z" fill="#fffdf6"/></svg>
+          <svg class="st st-3" viewBox="0 0 44 44" aria-hidden="true"><path d="M22 0Q26 18 44 22 26 26 22 44 18 26 0 22 18 18 22 0Z" fill="#ffe1b8"/></svg>
+          <svg class="st st-4" viewBox="0 0 44 44" aria-hidden="true"><path d="M22 0Q26 18 44 22 26 26 22 44 18 26 0 22 18 18 22 0Z" fill="#fffdf6"/></svg>
+          <svg class="st st-5" viewBox="0 0 44 44" aria-hidden="true"><path d="M22 0Q26 18 44 22 26 26 22 44 18 26 0 22 18 18 22 0Z" fill="#ffd9d5"/></svg>
+          <div class="halo"></div>
+
+          <div class="stack">
+            <div class="badge">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#e2574f"
+                   stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M2 18h20M6.5 18V4.4M17.5 18V4.4"/>
+                <path d="M2 11.6c2.6 0 4.5-7.2 4.5-7.2s2.3 9.2 5.5 9.2 5.5-9.2 5.5-9.2 1.9 7.2 4.5 7.2"/>
+              </svg>
+              San Francisco
+            </div>
+
+            <!-- ── the wordmark: Y2K chrome, ink-outlined sticker ── -->
+            <svg class="wordmark" viewBox="0 55 1080 208" role="img" aria-label="SF Quest">
+              <defs>
+                <linearGradient id="wm-chrome" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0"    stop-color="#ffffff"/>
+                  <stop offset=".15"  stop-color="#e4f3ff"/>
+                  <stop offset=".37"  stop-color="#6fb6ec"/>
+                  <stop offset=".485" stop-color="#2f6fbe"/>
+                  <stop offset=".515" stop-color="#ffe3ae"/>
+                  <stop offset=".68"  stop-color="#ff9d8c"/>
+                  <stop offset=".86"  stop-color="#fb6ea8"/>
+                  <stop offset="1"    stop-color="#ffd9ec"/>
+                </linearGradient>
+                <linearGradient id="wm-sheen" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0"   stop-color="#fff" stop-opacity="0"/>
+                  <stop offset=".5"  stop-color="#fff" stop-opacity=".8"/>
+                  <stop offset="1"   stop-color="#fff" stop-opacity="0"/>
+                </linearGradient>
+                <clipPath id="wm-clip">
+                  <text transform="translate(540,214) skewX(-8)" x="0" y="0" text-anchor="middle"
+                        font-family="'Titan One','Baloo 2',sans-serif" font-size="150" letter-spacing="5">SF QUEST</text>
+                </clipPath>
+              </defs>
+              <g font-family="'Titan One','Baloo 2',sans-serif" font-size="150" letter-spacing="5"
+                 text-anchor="middle" stroke-linejoin="round">
+                <text transform="translate(540,226) skewX(-8)" x="0" y="0" fill="#35313f" opacity=".2"
+                      stroke="#35313f" stroke-opacity=".2" stroke-width="30" paint-order="stroke">SF QUEST</text>
+                <text transform="translate(540,214) skewX(-8)" x="0" y="0" fill="#35313f"
+                      stroke="#35313f" stroke-width="30" paint-order="stroke">SF QUEST</text>
+                <text transform="translate(540,214) skewX(-8)" x="0" y="0" fill="#fffdf6"
+                      stroke="#fffdf6" stroke-width="18" paint-order="stroke">SF QUEST</text>
+                <text transform="translate(540,214) skewX(-8)" x="0" y="0" fill="#e2574f"
+                      stroke="#e2574f" stroke-width="9" paint-order="stroke">SF QUEST</text>
+                <text transform="translate(540,214) skewX(-8)" x="0" y="0" fill="url(#wm-chrome)">SF QUEST</text>
+              </g>
+              <g clip-path="url(#wm-clip)">
+                <path d="M0 60H1080V128Q540 162 0 128Z" fill="#fffdf6" opacity=".3"/>
+                <rect class="shine" x="-190" y="-60" width="130" height="440" fill="url(#wm-sheen)" transform="skewX(-24)"/>
+              </g>
+              <g fill="#fffdf6" stroke="#35313f" stroke-width="4.5" stroke-linejoin="round">
+                <path class="pop" transform="translate(70,112) scale(1.15)" d="M0-22Q3.5-6 22 0 3.5 6 0 22-3.5 6-22 0-3.5-6 0-22Z"/>
+                <path class="pop pop2" transform="translate(1014,88)" d="M0-22Q3.5-6 22 0 3.5 6 0 22-3.5 6-22 0-3.5-6 0-22Z"/>
+                <path class="pop pop3" transform="translate(948,240) scale(.76)" d="M0-22Q3.5-6 22 0 3.5 6 0 22-3.5 6-22 0-3.5-6 0-22Z"/>
+              </g>
+            </svg>
+
+            <div class="sub">a tiny San Francisco that lives on real data — bring a friend, the link is the invite</div>
+            <div class="keys">WASD move · Shift run · <kbd>Space</kbd> jump · drag to look · wheel zoom · <kbd>E</kbd> talk / read · <kbd>P</kbd> phone · <kbd>L</kbd> city pulse</div>
+
+            <div class="go-btn" id="startbtn">
+              <i class="leaf ll"></i><i class="leaf lr"></i>
+              <span class="lbl"><span id="startlbl">LOADING</span>
+                <svg width="21" height="21" viewBox="0 0 24 24" fill="#fffdf6" aria-hidden="true">
+                  <path d="M12 1.6l2.6 6.6 6.6 2.6-6.6 2.6L12 20l-2.6-6.6L2.8 10.8l6.6-2.6z"/>
+                </svg>
+              </span>
+              <span class="bar"><i id="startbar"></i></span>
+            </div>
+            <div class="go">click to step off the cable car ✨</div>
+          </div>
+
+          <div class="qr" id="qrcard" hidden>
+            <span id="qrimg"></span>
+            <div class="qr-t"><b>Play on your phone</b><span id="qrhint">scan — you land in <i>this</i> city</span></div>
+          </div>
+        </div>
+
+        <div class="doors" id="doors"><i class="dl"></i><i class="dr"></i><span class="dglow"></span></div>
+      </div>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>

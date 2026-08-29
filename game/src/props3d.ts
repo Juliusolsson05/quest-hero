@@ -78,9 +78,17 @@ const PLACEMENTS: Placement[] = [
   { file: 'vespa-scooter.glb',  x: 44.6, z: 45.5, size: 1.5, rot: -1.1, fit: 'length' },  // market curb
 ];
 
-/** Fire-and-forget: props pop in as they load; a missing file just warns. */
-export function initProps3d(scene: THREE.Scene, island: IslandView): void {
-  for (const p of PLACEMENTS) {
+/** Props pop in as they load and a missing file just warns, so nothing here
+ *  gates play. The returned promise and `onProgress` are only for the title
+ *  screen's loading bar — resolve means "the set is dressed", not "playable". */
+export function initProps3d(
+  scene: THREE.Scene,
+  island: IslandView,
+  onProgress?: (done: number, total: number) => void,
+): Promise<void> {
+  let done = 0;
+  const total = PLACEMENTS.length;
+  return Promise.all(PLACEMENTS.map((p) =>
     propTemplate(p.file, p.fit ?? 'height')
       .then((tpl) => {
         const m = tpl.clone();
@@ -89,6 +97,7 @@ export function initProps3d(scene: THREE.Scene, island: IslandView): void {
         m.rotation.y = p.rot ?? 0;
         scene.add(m);
       })
-      .catch((err) => console.warn(`prop ${p.file} failed to load`, err));
-  }
+      .catch((err) => console.warn(`prop ${p.file} failed to load`, err))
+      .finally(() => onProgress?.(++done, total)),
+  )).then(() => undefined);
 }

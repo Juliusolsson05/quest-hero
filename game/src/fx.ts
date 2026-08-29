@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { TimePhase, WeatherKind } from '../../shared/protocol';
 import type { BuiltWorld } from './world';
+import type { DistanceLayer } from './distance';
 
 /**
  * Atmosphere: the sun/sky/fog rig driven by (real) time of day, weather
@@ -55,6 +56,8 @@ export class Atmosphere {
   private lampLights: THREE.PointLight[] = [];
   private lampHeads: THREE.Mesh[] = [];
   private water: BuiltWorld['water'] = null;
+  private sea: THREE.Object3D | null = null;
+  private distance: DistanceLayer[] = [];
 
   hour = 12;
   phase: TimePhase = 'day';
@@ -80,7 +83,7 @@ export class Atmosphere {
 
     this.skyUniforms = { top: { value: new THREE.Color(0x9fd4f5) }, bottom: { value: new THREE.Color(0xd9ecf5) } };
     this.skyDome = new THREE.Mesh(
-      new THREE.SphereGeometry(190, 24, 16),
+      new THREE.SphereGeometry(900, 24, 16),
       new THREE.ShaderMaterial({
         side: THREE.BackSide, depthWrite: false, fog: false,
         uniforms: this.skyUniforms as unknown as Record<string, THREE.IUniform>,
@@ -135,8 +138,14 @@ export class Atmosphere {
     this.rainVel = Array.from({ length: 1500 }, () => 14 + Math.random() * 8);
   }
 
+  /** Hand over the painted distance so its haze can track the sky. */
+  attachDistance(layers: DistanceLayer[]): void {
+    this.distance = layers;
+  }
+
   attachWorld(built: BuiltWorld): void {
     this.water = built.water;
+    this.sea = built.sea;
 
     // Lamp glow heads + a few real lights (physical lights are pricey — cap them).
     for (const [i, p] of built.lamps.entries()) {
@@ -247,6 +256,10 @@ export class Atmosphere {
     const horizon = mix(s.horizon, mod.grey * 0.9);
     this.skyUniforms.top.value.copy(sky);
     this.skyUniforms.bottom.value.copy(horizon);
+    // The painted distance hazes toward the horizon rather than into fog, so
+    // it stays a readable silhouette at any hour instead of dissolving.
+    for (const l of this.distance) l.material.color.copy(l.base).lerp(horizon, l.haze);
+
     const fog = this.scene.fog as THREE.Fog;
     fog.color.copy(horizon);
     fog.far += ((s.fogFar * THREE.MathUtils.lerp(1, mod.fogFar, this.weatherBlend)) - fog.far) * Math.min(1, dt * 2);
@@ -351,7 +364,9 @@ export class Atmosphere {
       p.needsUpdate = true;
     }
 
-    if (this.water) this.water.position.y = Math.sin(this.t * 1.1) * 0.045;
+    const swell = Math.sin(this.t * 1.1) * 0.045;
+    if (this.water) this.water.position.y = swell;
+    if (this.sea) this.sea.position.y = swell;
     this.skyDome.position.set(camPos.x, CENTER.y, camPos.z);
   }
 }

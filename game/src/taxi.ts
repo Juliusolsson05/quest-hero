@@ -90,6 +90,7 @@ export class CartService {
     if (!this.nearCart()) return;
     this.phase = 'riding';
     this.player.view.root.visible = false;
+    this.player.controlled = false;     // the cart owns the hero's pose now
     document.body.dataset.typing = '1'; // freeze WASD while riding
     // Destination: whichever plaza/bridge end is the longer, nicer ride.
     const island = this.island()!;
@@ -173,6 +174,7 @@ export class CartService {
     const island = this.island();
     const m = this.mesh!;
     this.player.view.root.visible = true;
+    this.player.controlled = true;
     delete document.body.dataset.typing;
     // Step out onto the curb beside the cart.
     const side = new THREE.Vector3(Math.cos(m.rotation.y), 0, -Math.sin(m.rotation.y));

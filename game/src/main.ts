@@ -6,6 +6,8 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import type { Quest, ServerFrame } from '../../shared/protocol';
 import { Net } from './net';
 import { buildIsland, IslandView } from './world';
+import { buildDistance } from './distance';
+import { WaterFx } from './water-fx';
 import { Player } from './player';
 import { Entities } from './entities';
 import { Bubbles } from './bubbles';
@@ -33,6 +35,8 @@ scene.add(entities.group, player.view.root);
 const bubbles = new Bubbles();
 const ui = new Ui();
 const phone = new CartlyPhone();
+const waterFx = new WaterFx();
+scene.add(waterFx.group);
 
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, player.camera));
@@ -61,6 +65,11 @@ net.on((f: ServerFrame) => {
         scene.add(built.group);
         fx.attachWorld(built);
         initProps3d(scene, island); // Tripo kawaii props + the parked fleet
+        // The painted distance: rocks, headlands, a skyline — so the eye never
+        // finds the edge of the tile grid.
+        const far = buildDistance(new THREE.Vector3(f.island.size / 2, 0, f.island.size / 2));
+        scene.add(far.group);
+        fx.attachDistance(far.layers);
         const spawn = f.island.pois.find((p) => p.id === 'plaza')?.pos ?? { x: 24, y: 2, z: 30 };
         player.bindIsland(island, new THREE.Vector3(spawn.x, spawn.y, spawn.z + 4));
         boardPos = (() => {
@@ -124,6 +133,11 @@ ui.onSay = (npcId, text) => {
   bubbles.push('player', 'you', '#e8f7ee', 'commit', text, 'neutral');
 };
 ui.onAccept = (id) => net.send({ t: 'quest', id, action: 'accept' });
+
+// ── the sea ────────────────────────────────────────────────────────────────
+player.onEnterWater = (x, z) => waterFx.splash(x, z, 1);
+player.onLeaveWater = () => waterFx.splash(player.pos.x, player.pos.z, 0.5);
+player.onCurrent = () => ui.toast('the current out here is brutal — best turn back', '🌊');
 
 // ── Cartly: a real cart from the Tripo fleet rolls in over the Golden Gate ──
 const carts = new CartService(scene, player, () => island);
@@ -196,6 +210,8 @@ renderer.setAnimationLoop(() => {
   player.update(dt);
   carts.update(dt); // after player.update so a ride overrides the hero's pose
   entities.update(dt);
+  if (player.swimming) waterFx.trail(player.pos.x, player.pos.z, player.anim !== 'idle', dt);
+  waterFx.update(dt);
   fx.update(dt, player.camera);
 
   // Interaction prompt.

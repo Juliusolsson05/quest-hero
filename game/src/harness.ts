@@ -37,6 +37,34 @@ async function configuredModels(): Promise<string[]> {
   return models.map((m) => m.name).filter((n): n is string => !!n);
 }
 
+/**
+ * Connectors in the shipped catalog that answer questions about the world
+ * outside the game. Matched by name against what is configured, so a provider
+ * added in Settings is picked up on the next reload without a code change —
+ * which is the point: the data pipeline should live inside the agent workflow,
+ * not beside it in a hardcoded list that goes stale.
+ */
+const WEB_CONNECTORS = ['bright-data', 'tavily', 'exa', 'parallel-web'];
+
+let connectorPromise: Promise<string[]> | null = null;
+
+/** Names of configured web connectors that are actually usable. An unauthenticated
+ *  server would be attached and then fail mid-conversation, which is worse than
+ *  not offering it at all. */
+async function webConnectors(): Promise<string[]> {
+  const res = await fetch(`${BASE}/api/v1/mcp-servers`);
+  if (!res.ok) throw new HarnessUnavailable(`connectors: ${res.status}`);
+  const servers: { name?: string; auth_status?: { status?: string } }[] =
+    (await res.json())?.data ?? [];
+  return servers
+    .filter((s) => s.name && WEB_CONNECTORS.includes(s.name))
+    .filter((s) => (s.auth_status?.status ?? 'authenticated') === 'authenticated')
+    .map((s) => s.name!)
+    // Catalog order, so a character prefers the richer scraping provider when
+    // both are present rather than depending on API response ordering.
+    .sort((a, b) => WEB_CONNECTORS.indexOf(a) - WEB_CONNECTORS.indexOf(b));
+}
+
 async function sessionFor(npc: NpcDef): Promise<string> {
   const existing = sessions.get(npc.id);
   if (existing) return existing;
@@ -44,6 +72,15 @@ async function sessionFor(npc: NpcDef): Promise<string> {
   modelPromise ??= configuredModels();
   const available = await modelPromise;
   const model = available.includes(npc.model) ? npc.model : available[0];
+
+  // Resolved once per page load and shared, since it is a property of the
+  // harness rather than of any one character.
+  let connectors: string[] = [];
+  if (npc.webAccess) {
+    connectorPromise ??= webConnectors();
+    connectors = await connectorPromise;
+  }
+
   if (!model) {
     throw new HarnessUnavailable(
       'no model configured in TrueForge — add a provider at http://localhost:8790 (Settings -> Models)',
@@ -58,9 +95,7 @@ async function sessionFor(npc: NpcDef): Promise<string> {
         spec: {
           model: { name: model },
           instructions: npc.persona,
-          ...(npc.mcpServers?.length
-            ? { mcp_servers: npc.mcpServers.map((name) => ({ name })) }
-            : {}),
+          ...(connectors.length ? { mcp_servers: connectors.map((name) => ({ name })) } : {}),
         },
       },
     }),

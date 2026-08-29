@@ -146,6 +146,14 @@ void loadManifest();
 const playerAnchor = new THREE.Vector3();
 const clock = new THREE.Clock();
 renderer.setAnimationLoop(() => {
+  // Some hosts (emulated viewports, panes) never fire `resize` — poll instead.
+  const size = renderer.getSize(new THREE.Vector2());
+  if (size.x !== innerWidth || size.y !== innerHeight) {
+    player.camera.aspect = innerWidth / innerHeight;
+    player.camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+    composer.setSize(innerWidth, innerHeight);
+  }
   const dt = Math.min(clock.getDelta(), 0.1);
   player.update(dt);
   entities.update(dt);

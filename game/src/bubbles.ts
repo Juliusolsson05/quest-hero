@@ -19,6 +19,7 @@ interface Bubble {
   shown: number;     // chars currently revealed
   mode: BubbleMode;
   expireAt: number;  // performance.now() ms, Infinity = sticky
+  lastFed: number;   // last push() — a stalled stream must not stick forever
   done: boolean;
 }
 
@@ -66,7 +67,7 @@ export class Bubbles {
       root.innerHTML = `<div class="b-name"></div><div class="b-text"></div>`;
       this.layer.append(root);
       b = { root, name: root.querySelector('.b-name')!, text: root.querySelector('.b-text')!,
-            full: '', shown: 0, mode, expireAt: Infinity, done: false };
+            full: '', shown: 0, mode, expireAt: Infinity, lastFed: performance.now(), done: false };
       this.bubbles.set(who, b);
     }
     b.root.style.setProperty('--bub', tint || '#fffdf6');
@@ -75,6 +76,7 @@ export class Bubbles {
     b.root.classList.remove('fade');
     b.mode = mode;
     b.done = false;
+    b.lastFed = performance.now();
 
     if (mode === 'thinking') { b.full = ''; b.shown = 0; b.text.textContent = ''; b.expireAt = Infinity; }
     else if (mode === 'tool') { b.full = ''; b.shown = 0; b.text.textContent = `📡 ${text || 'consulting the ravens'}`; b.expireAt = Infinity; }
@@ -102,6 +104,12 @@ export class Bubbles {
          anchorFor: (who: string) => THREE.Vector3 | null): void {
     const now = performance.now();
     for (const [who, b] of this.bubbles) {
+      // A stream that stopped feeding (dead turn) winds down like a commit.
+      if (!b.done && now - b.lastFed > 20_000) {
+        b.done = true;
+        b.expireAt = now + Math.max(2500, b.full.length * 50);
+        b.root.classList.remove('think');
+      }
       // typewriter catch-up: fast enough to never lag a stream badly
       if (b.shown < b.full.length) {
         b.shown = Math.min(b.full.length, b.shown + dt * (b.done ? 120 : 42));

@@ -6,7 +6,10 @@ import type { ClientFrame, ServerFrame } from '../../shared/protocol';
  * caller shows a "waking the village" overlay until `welcome` arrives.
  */
 
-const HUB_WS = import.meta.env.VITE_HUB_WS ?? 'ws://localhost:7777/ws';
+// `?hub=ws://…` lets a demo (or a mock hub) retarget without a rebuild.
+const HUB_WS =
+  new URLSearchParams(location.search).get('hub') ??
+  import.meta.env.VITE_HUB_WS ?? 'ws://localhost:7777/ws';
 
 type Handler = (f: ServerFrame) => void;
 

@@ -554,20 +554,34 @@ function buildProps(props: Prop[], view: IslandView) {
         }
         B(0, 9.75, -0.9, 0.09, 1.2, 0.09, C.dark);         // antenna
         B(0, 10.42, -0.9, 0.18, 0.18, 0.18, 0xff5540);     // beacon
-        // ── FAT ROOF LETTERS on the tower ──
-        const TH = 0.34, DEEP = 0.34, BASE = 9.2, LZ = 0.35 - 0.9;
+        // ── FAT ROOF LETTERS across the base-tier roof: S T A R T U P ──
+        const TH = 0.3, DEEP = 0.34, BASE = 4.02, LZ = 2.45;
         const seg = (ox: number, lx: number, ly: number, w: number, h: number) =>
           B(ox + lx, BASE + ly, LZ, w, h, DEEP, C.dark);
-        // I
-        seg(-1.35, 0, 1.45, 1.0, 0.3); seg(-1.35, 0, 0.8, TH, 1.0); seg(-1.35, 0, 0.15, 1.0, 0.3);
-        // R
-        seg(0, -0.33, 0.8, TH, 1.6); seg(0, 0.08, 1.45, 0.85, 0.3);
-        seg(0, 0.33, 1.1, TH, 0.55); seg(0, 0.08, 0.82, 0.85, 0.28);
-        seg(0, 0.3, 0.34, TH, 0.68);
-        // S
-        seg(1.35, 0, 1.45, 1.0, 0.3); seg(1.35, -0.33, 1.12, TH, 0.42);
-        seg(1.35, 0, 0.8, 1.0, 0.3); seg(1.35, 0.33, 0.48, TH, 0.42);
-        seg(1.35, 0, 0.15, 1.0, 0.3);
+        const S = (ox: number) => {
+          seg(ox, 0, 1.45, 0.95, 0.3); seg(ox, -0.33, 1.12, TH, 0.42);
+          seg(ox, 0, 0.8, 0.95, 0.3); seg(ox, 0.33, 0.48, TH, 0.42);
+          seg(ox, 0, 0.15, 0.95, 0.3);
+        };
+        const T = (ox: number) => { seg(ox, 0, 1.45, 0.95, 0.3); seg(ox, 0, 0.65, TH, 1.3); };
+        const A = (ox: number) => {
+          seg(ox, -0.33, 0.7, TH, 1.4); seg(ox, 0.33, 0.7, TH, 1.4);
+          seg(ox, 0, 1.45, 0.95, 0.3); seg(ox, 0, 0.75, 0.95, 0.26);
+        };
+        const Rr = (ox: number) => {
+          seg(ox, -0.33, 0.8, TH, 1.6); seg(ox, 0.08, 1.45, 0.85, 0.3);
+          seg(ox, 0.33, 1.1, TH, 0.55); seg(ox, 0.08, 0.82, 0.85, 0.28);
+          seg(ox, 0.3, 0.34, TH, 0.68);
+        };
+        const U = (ox: number) => {
+          seg(ox, -0.33, 0.95, TH, 1.3); seg(ox, 0.33, 0.95, TH, 1.3);
+          seg(ox, 0, 0.15, 0.95, 0.3);
+        };
+        const P = (ox: number) => {
+          seg(ox, -0.33, 0.8, TH, 1.6); seg(ox, 0.08, 1.45, 0.85, 0.3);
+          seg(ox, 0.33, 1.1, TH, 0.55); seg(ox, 0.08, 0.82, 0.85, 0.28);
+        };
+        S(-3.3); T(-2.2); A(-1.1); Rr(0); T(1.1); U(2.2); P(3.3);
         break;
       }
       case 'transamerica': {

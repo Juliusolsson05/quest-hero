@@ -31,6 +31,8 @@ const SMG_DMG = 2.2;    // per hit — you can miss now, so hits count for more
 const MARK_R = 1.05;    // his hit cylinder
 const MARK_H = 2.75;
 const PILLAR_R = 0.95;  // pillar shaft radius for bullets and the laser
+const ASSIST_RAD = 0.16; // aim assist: within ~9 degrees (horizontal) of Mark, the shot snaps
+const AIM_ANCHOR_Y = 2.15; // the crosshair floats here, just above the hero's head
 
 type Phase = 'off' | 'countdown' | 'aim' | 'lock' | 'flight' | 'cooldown' | 'victory' | 'audited';
 
@@ -104,28 +106,29 @@ export class BossFight {
     };
     this.banner = el(
       'position:fixed;top:16%;left:0;right:0;text-align:center;z-index:30;pointer-events:none;' +
-      'font:900 34px system-ui;color:#fff;text-shadow:0 3px 0 #28304a,0 0 26px rgba(255,74,61,.7);display:none;');
+      'font:900 min(29px, 6.4vw) system-ui;color:#fff;text-shadow:0 3px 0 #28304a,0 0 26px rgba(255,74,61,.7);display:none;');
     const barCss = (bottom: string, w: string) =>
       `position:fixed;${bottom}left:50%;transform:translateX(-50%);width:${w};height:16px;z-index:30;` +
       'background:#1d1f2a;border:2px solid #2e3140;border-radius:9px;overflow:hidden;display:none;pointer-events:none;';
-    this.myBar = el(barCss('bottom:26px;', '280px'));
+    this.myBar = el(barCss('bottom:26px;', 'min(280px, 60vw)'));
     this.myFill = document.createElement('div');
     this.myFill.style.cssText = 'height:100%;width:100%;background:linear-gradient(#aee3c8,#7cc474);transition:width .12s';
     this.myBar.append(this.myFill);
-    this.markBar = el(barCss('top:56px;', '420px'));
+    this.markBar = el(barCss('top:56px;', 'min(420px, 84vw)'));
     this.markFill = document.createElement('div');
     this.markFill.style.cssText = 'height:100%;width:100%;background:linear-gradient(#ff9d96,#e4574f);transition:width .12s';
     this.markBar.append(this.markFill);
     const label = document.createElement('div');
     label.style.cssText = 'position:absolute;top:-24px;left:0;right:0;text-align:center;font:800 13px system-ui;color:#fffdf6;text-shadow:0 2px 0 #28304a';
-    label.textContent = 'IRS MARK — W-2 ENFORCER';
+    label.textContent = 'MARK — THE STARTUP ENEMY';
     this.markBar.append(label);
     this.vignette = el(
       'position:fixed;inset:0;pointer-events:none;z-index:29;opacity:0;transition:opacity .35s;' +
       'box-shadow:inset 0 0 140px 50px rgba(228,60,45,.55);');
-    // crosshair: four ticks and a dot, dead center — where the SMG shoots
+    // crosshair: four ticks and a dot, floating above the hero — the SMG
+    // shoots along the camera ray through this point
     this.crosshair = el(
-      'position:fixed;left:50%;top:50%;width:26px;height:26px;transform:translate(-50%,-50%);' +
+      'position:fixed;left:0;top:0;width:26px;height:26px;will-change:transform;' +
       'z-index:30;pointer-events:none;display:none;');
     this.crosshair.innerHTML =
       '<svg viewBox="0 0 26 26" width="26" height="26">' +
@@ -205,10 +208,10 @@ export class BossFight {
     this.fx.rocketAbort();
     this.arena.boss.setMode('defeat');
     this.fx.confetti();
-    this.setBanner('AUDIT CANCELLED — REFUND APPROVED');
+    this.setBanner('MARK IS DEFEATED — GO BUILD');
     this.banner.style.textShadow = '0 3px 0 #28304a, 0 0 26px rgba(255,217,119,.8)';
     this.crosshair.style.display = 'none';
-    this.hooks.toast('Mark drops the bazooka. "…your paperwork is in order."', '💸');
+    this.hooks.toast('Mark drops the bazooka. "…maybe you will make it after all."', '💸');
     setTimeout(() => { this.banner.style.display = 'none'; }, 4200);
   }
 
@@ -219,7 +222,7 @@ export class BossFight {
     this.fx.gibs(this.player.pos);
     this.player.view.root.visible = false;
     this.crosshair.style.display = 'none';
-    this.setBanner('YOU HAVE BEEN AUDITED');
+    this.setBanner('MARK WAS RIGHT ABOUT YOU');
     this.banner.style.display = 'block';
     setTimeout(() => this.hooks.onAudited(), 1300);
   }
@@ -255,14 +258,35 @@ export class BossFight {
   }
 
   /**
-   * The aim system: a ray from the camera through the crosshair. Returns the
-   * world point the shot lands on — Mark's hit cylinder, a pillar, or a wall
-   * — and whether that point is Mark.
+   * The aim system: a ray from the camera through the crosshair floating
+   * above the hero's head. If it passes within ~9 degrees of Mark
+   * horizontally (vertical is forgiven — players aim in yaw), it snaps to
+   * his chest. Returns the world point the shot lands on — Mark's hit
+   * cylinder, a pillar, or a wall — and whether that point is Mark.
    */
   private aimRay(hit: THREE.Vector3): boolean {
     const cam = this.player.camera;
     const origin = this.tmpC.copy(cam.position);
-    const dir = cam.getWorldDirection(this.tmpD);
+    const dir = this.tmpD
+      .set(this.player.pos.x, this.player.pos.y + AIM_ANCHOR_Y, this.player.pos.z)
+      .sub(origin)
+      .normalize();
+
+    {
+      const boss = this.arena.boss.root.position;
+      const mx = boss.x - origin.x, my = boss.y + 1.8 - origin.y, mz = boss.z - origin.z;
+      const mLen = Math.sqrt(mx * mx + my * my + mz * mz);
+      const mH = Math.hypot(mx, mz);
+      const dH = Math.hypot(dir.x, dir.z);
+      if (mH > 1e-4 && dH > 1e-4) {
+        const cosH = (dir.x * mx + dir.z * mz) / (mH * dH);
+        const vAim = Math.atan2(dir.y, dH);
+        const vMark = Math.atan2(my, mH);
+        if (cosH > Math.cos(ASSIST_RAD) && Math.abs(vAim - vMark) < 0.4) {
+          dir.set(mx / mLen, my / mLen, mz / mLen);
+        }
+      }
+    }
 
     // far point: walk the ray to the arena walls (or 60 units, whichever first)
     let tMax = 60;
@@ -326,9 +350,19 @@ export class BossFight {
     );
   }
 
+  /** Pin the crosshair to the screen position of the point the SMG aims through. */
+  private syncCrosshair(): void {
+    const v = this.tmpA.set(this.player.pos.x, this.player.pos.y + AIM_ANCHOR_Y, this.player.pos.z)
+      .project(this.player.camera);
+    const x = (v.x * 0.5 + 0.5) * innerWidth;
+    const y = (1 - (v.y * 0.5 + 0.5)) * innerHeight;
+    this.crosshair.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%,-50%)`;
+  }
+
   update(dt: number): void {
     this.fxAndShake(dt);
     if (this.phase === 'off' || this.frozen) return;
+    this.syncCrosshair();
     const boss = this.arena.boss;
     const pp = this.player.pos;
 
@@ -352,10 +386,10 @@ export class BossFight {
       case 'countdown': {
         this.t -= dt;
         boss.ragePower = 1 - Math.max(0, this.t) / COUNTDOWN;
-        this.setBanner(`IRS MARK IS GETTING MAD — ${Math.max(1, Math.ceil(this.t))}`);
+        this.setBanner(`MARK THE STARTUP ENEMY IS GETTING MAD — ${Math.max(1, Math.ceil(this.t))}`);
         if (this.t <= 0) {
           boss.setMode('fight');
-          this.setBanner('AUDIT COMMENCED');
+          this.setBanner('THE ROAST COMMENCES');
           setTimeout(() => { if (this.phase !== 'countdown') this.banner.style.display = 'none'; }, 1400);
           this.shakeT = 0.4;
           this.phase = 'aim';

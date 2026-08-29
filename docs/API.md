@@ -77,8 +77,13 @@ Server→client frames (JSON, `{t: type, ...}`):
 · `bubble {who, convId?, text, emotion, mode:'delta'|'commit'|'ambient'|'thinking'|'tool'}`
 · `weather {…}` · `time {…}` · `object {op:'add'|'remove', object}` · `quest {quest}`
 
+· `boss {ev:'say'|'question'|'verdict', …}` — Mark the startup enemy's fight channel;
+  sent only to the socket that asked, never broadcast (rounds are private per player)
+
 Client→server: `hello {name}` · `pose {pos,rot,anim}` (10Hz) · `talk {npcId, text}`
 · `interact {targetId}` · `quest {id, action:'accept'}`
+· `boss {do:'question'}` / `boss {do:'taunt'}` / `boss {do:'answer', qid, text}` —
+  request a trivia round, an idle insult, or submit an answer (see mcp/mark)
 
 MCP servers normally don't need the WS — use REST + SSE.
 

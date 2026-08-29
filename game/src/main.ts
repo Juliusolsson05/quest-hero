@@ -132,8 +132,10 @@ const cartly = new Cartly(scene, player, () => island, {
 
 const irs = new IrsEncounter(scene, generatedIsland, player, toast);
 irs.onSeclusion = (secluded) => { mp.avatarsVisible = !secluded; };
+// Mark trash-talks in the same kawaii bubbles as every citizen.
+irs.speak = (text) => bubbles.push('mark', 'Mark', '#ffd9c9', 'commit', text, 'neutral');
 
-const hub = new HubLink({ player, entities, ui, fx, bubbles, feed, cartly });
+const hub = new HubLink({ player, entities, ui, fx, bubbles, feed, cartly, irs });
 
 if (import.meta.env.DEV) { // console-inspection only — never shipped
   (window as unknown as Record<string, unknown>).__sfq = { island, player, mp, cartly, irs };
@@ -251,6 +253,7 @@ renderer.setAnimationLoop(() => {
   bubbles.update(dt, player.camera, (who) =>
     who === 'player'
       ? playerAnchor.copy(player.pos).add(new THREE.Vector3(0, 2.05, 0))
+      : who === 'mark' ? irs.markAnchor()
       : entities.anchor(who));
 
   composer.render();

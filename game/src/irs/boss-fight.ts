@@ -25,7 +25,9 @@ const BLAST_R = 3.4;
 const BLAST_DMG = 38;   // point blank, falling to…
 const BLAST_MIN = 10;   // …at the rim; zero behind a pillar
 const PLAYER_HP = 100;
-const MARK_HP = 1040;
+const MARK_HP = 1000;
+const REWARD_DMG = MARK_HP / 5;   // five correct answers end him — SMG chip is a bonus
+const WRONG_DMG = PLAYER_HP / 5;  // five wrong answers end you
 const SMG_RPS = 11;
 const SMG_DMG = 1.1;    // chip damage — the trivia rounds are where real damage happens
 const MARK_R = 1.05;    // his hit cylinder
@@ -50,6 +52,12 @@ export class BossFight {
   private lockedPoint = new THREE.Vector3();
   private shakeT = 0;
   private repositionTo: { x: number; z: number } | null = null;
+  /** Question-round cinematics: whose rocket is in the air while frozen. */
+  private cine: 'none' | 'playerShot' | 'markShot' = 'none';
+  private cineTarget = new THREE.Vector3();
+
+  private qTimer: ReturnType<typeof setInterval> | null = null;
+  private readonly launcher: THREE.Group;
   private readonly fx = new FightFx();
   private readonly gun: THREE.Group;
   private lastBanner = '';
@@ -68,6 +76,11 @@ export class BossFight {
   private readonly markFill: HTMLDivElement;
   private readonly vignette: HTMLDivElement;
   private readonly crosshair: HTMLDivElement;
+  private readonly qPanel: HTMLDivElement;
+  private readonly qText: HTMLDivElement;
+  private readonly qInput: HTMLInputElement;
+  private readonly qGo: HTMLButtonElement;
+  private readonly qClock: HTMLDivElement;
 
   constructor(
     scene: THREE.Scene,
@@ -136,6 +149,53 @@ export class BossFight {
       '<line x1="13" y1="0" x2="13" y2="7"/><line x1="13" y1="19" x2="13" y2="26"/>' +
       '<line x1="0" y1="13" x2="7" y2="13"/><line x1="19" y1="13" x2="26" y2="13"/></g>' +
       '<circle cx="13" cy="13" r="1.6" fill="#ffd977"/></svg>';
+
+    // the verdict launcher: shoulder tube the hero produces from nowhere for
+    // exactly one very satisfying shot per correct answer
+    this.launcher = new THREE.Group();
+    const lm = new THREE.MeshStandardMaterial({ color: 0x3a5a40, roughness: 0.6 });
+    const lpart = (w: number, h: number, d: number, x: number, y: number, z: number, m = lm) => {
+      const b = new THREE.Mesh(shadedBox(w, h, d), m);
+      b.position.set(x, y, z);
+      this.launcher.add(b);
+      return b;
+    };
+    lpart(0.2, 0.2, 1.1, 0, 0, 0);                                   // tube
+    lpart(0.26, 0.26, 0.2, 0, 0, 0.56);                              // bell
+    lpart(0.07, 0.14, 0.07, 0, -0.16, 0.1);                          // grip
+    lpart(0.05, 0.05, 0.3, 0, 0.13, 0,
+      new THREE.MeshStandardMaterial({ color: 0xffd977, roughness: 0.4 })); // brass sight
+    this.launcher.position.set(0.34, 1.16, 0);
+    this.launcher.visible = false;
+    player.view.root.add(this.launcher);
+
+    // the audit question panel
+    this.qPanel = el(
+      'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:min(520px,92vw);z-index:35;' +
+      'background:#fffdf6;border:3px solid #2e3140;border-radius:18px;padding:18px 20px 16px;display:none;' +
+      'box-shadow:0 8px 0 rgba(53,49,63,.3);font-family:"Baloo 2",system-ui;');
+    this.qPanel.innerHTML =
+      '<div style="font:900 13px inherit;color:#e4574f;letter-spacing:.08em">AUDIT QUESTION</div>';
+    this.qText = document.createElement('div');
+    this.qText.style.cssText = 'font:700 17px inherit;color:#35313f;margin:8px 0 12px;';
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:8px;';
+    this.qInput = document.createElement('input');
+    this.qInput.style.cssText =
+      'flex:1;border:2px solid #2e3140;border-radius:10px;padding:8px 12px;font:700 15px inherit;' +
+      'background:#fff;color:#35313f;min-width:0;';
+    this.qInput.placeholder = 'your answer…';
+    this.qGo = document.createElement('button');
+    this.qGo.textContent = 'ANSWER';
+    this.qGo.style.cssText =
+      'border:none;border-radius:10px;padding:8px 16px;font:900 14px inherit;cursor:pointer;' +
+      'background:#e4574f;color:#fffdf6;box-shadow:0 3px 0 rgba(53,49,63,.25);';
+    row.append(this.qInput, this.qGo);
+    this.qClock = document.createElement('div');
+    this.qClock.style.cssText =
+      'height:8px;margin-top:12px;border-radius:5px;background:#e8e4da;overflow:hidden;';
+    this.qClock.innerHTML = '<div style="height:100%;width:100%;background:linear-gradient(90deg,#ffd977,#e4574f)"></div>';
+    this.qPanel.append(this.qText, row, this.qClock);
   }
 
   get active(): boolean { return this.phase !== 'off'; }
@@ -167,10 +227,111 @@ export class BossFight {
     this.crosshair.style.display = 'none';
     this.vignette.style.opacity = '0';
     this.lastBanner = '';
+    this.cine = 'none';
+    this.launcher.visible = false;
+    this.qPanel.style.display = 'none';
+    if (this.qTimer) { clearInterval(this.qTimer); this.qTimer = null; }
+    delete document.body.dataset.typing;
     this.player.view.root.visible = true;
   }
 
   setFiring(on: boolean): void { this.firing = on; }
+
+  // ── question rounds (driven by the encounter via the hub) ────────────────
+
+  /** True while the shooter is actually exchanging fire. */
+  get inCombat(): boolean {
+    return this.phase === 'aim' || this.phase === 'lock' || this.phase === 'flight' || this.phase === 'cooldown';
+  }
+
+  /**
+   * Freeze THIS fight for a question — never mid-rocket, so nothing lands
+   * during the exam. Only the local player and their Mark pause; the hub,
+   * the city, and everyone else's fights run on.
+   */
+  tryFreezeForRound(): boolean {
+    if (this.frozen || this.cine !== 'none') return false;
+    if (this.phase !== 'aim' && this.phase !== 'lock' && this.phase !== 'cooldown') return false;
+    this.frozen = true;
+    this.firing = false;
+    this.fx.laserHide();
+    this.say('HOLD YOUR FIRE. Audit question.');
+    return true;
+  }
+
+  /** Mark's voice — the encounter wires this to the town's bubble system,
+   *  so he talks exactly like every other citizen: anchored to his head. */
+  say: (text: string) => void = () => {};
+
+  /** Put the question on screen; onSubmit fires exactly once (empty = timeout). */
+  askQuestion(text: string, deadlineS: number, onSubmit: (answer: string) => void): void {
+    this.qText.textContent = text;
+    this.qInput.value = '';
+    this.qInput.disabled = this.qGo.disabled = false;
+    this.qPanel.style.display = 'block';
+    document.body.dataset.typing = '1'; // movement and fire keys stand down
+    const bar = this.qClock.firstElementChild as HTMLElement;
+    bar.style.width = '100%';
+    const t0 = Date.now();
+    let sent = false;
+    const submit = (answer: string) => {
+      if (sent) return;
+      sent = true;
+      if (this.qTimer) { clearInterval(this.qTimer); this.qTimer = null; }
+      this.qInput.disabled = this.qGo.disabled = true;
+      this.qText.textContent = 'Mark is auditing your answer…';
+      onSubmit(answer);
+    };
+    this.qGo.onclick = () => submit(this.qInput.value);
+    this.qInput.onkeydown = (e) => { if (e.key === 'Enter') submit(this.qInput.value); };
+    if (this.qTimer) clearInterval(this.qTimer);
+    this.qTimer = setInterval(() => {
+      const left = deadlineS * 1000 - (Date.now() - t0);
+      bar.style.width = `${Math.max(0, (left / (deadlineS * 1000)) * 100)}%`;
+      if (left <= 0) submit(this.qInput.value); // whatever is typed, time is up
+    }, 100);
+    this.qInput.focus();
+  }
+
+  /** The verdict lands: flash it, then the rocket cinematic settles the score. */
+  applyVerdict(correct: boolean, expected: string, line: string): void {
+    this.qText.textContent = correct ? '✓ CORRECT' : `✗ WRONG — the answer: ${expected}`;
+    this.qText.style.color = correct ? '#4e9a06' : '#e4574f';
+    this.say(line);
+    setTimeout(() => {
+      this.qPanel.style.display = 'none';
+      this.qText.style.color = '#35313f';
+      // dataset.typing stays set: you HOLD STILL while the verdict rocket
+      // flies, yours or his — released when it lands (fxAndShake).
+      const boss = this.arena.boss.root.position;
+      if (correct) {
+        // your turn: the launcher appears, and Mark learns some respect
+        this.gun.visible = false;
+        this.launcher.visible = true;
+        const d = Math.atan2(boss.x - this.player.pos.x, boss.z - this.player.pos.z);
+        this.player.rot = d;
+        this.cineTarget.set(boss.x, IRS_ARENA.floorY + 1.4, boss.z);
+        this.cine = 'playerShot';
+        this.fx.rocketLaunch(
+          this.tmpA.set(this.player.pos.x + Math.sin(d) * 0.5, this.player.pos.y + 1.2, this.player.pos.z + Math.cos(d) * 0.5),
+          this.cineTarget, 1.15);
+      } else {
+        this.arena.boss.facePoint(this.player.pos.x, this.player.pos.z, 1, 100);
+        this.arena.boss.recoil();
+        this.cineTarget.set(this.player.pos.x, IRS_ARENA.floorY, this.player.pos.z);
+        this.cine = 'markShot';
+        this.fx.rocketLaunch(this.arena.boss.muzzleWorld(this.tmpA), this.cineTarget, 1.15);
+      }
+    }, 1400);
+  }
+
+  /** The hub never answered (no server, no question): resume the shooter. */
+  cancelRound(): void {
+    this.qPanel.style.display = 'none';
+    delete document.body.dataset.typing;
+    if (this.qTimer) { clearInterval(this.qTimer); this.qTimer = null; }
+    if (this.cine === 'none') this.frozen = false;
+  }
 
   /** External damage entry — the MCP verdict cinematic lands here later. */
   damageBoss(n: number): void {
@@ -453,6 +614,23 @@ export class BossFight {
 
   private fxAndShake(dt: number): void {
     const landed = this.fx.update(dt);
+    if (landed && this.cine !== 'none') {
+      this.fx.explode(this.cineTarget);
+      this.shakeT = Math.max(this.shakeT, 0.55);
+      if (this.cine === 'playerShot') {
+        this.damageBoss(REWARD_DMG);
+        this.arena.boss.flinch();
+      } else {
+        this.damagePlayer(WRONG_DMG);
+      }
+      this.cine = 'none';
+      this.launcher.visible = false;
+      delete document.body.dataset.typing; // the shot landed; you may move again
+      if (this.active) this.gun.visible = true;
+      // a beat to admire the crater, then the shooter resumes
+      setTimeout(() => { if (this.active) this.frozen = false; }, 700);
+      return;
+    }
     if (landed && this.phase === 'flight') {
       this.fx.explode(this.lockedPoint);
       this.shakeT = Math.max(this.shakeT, 0.5);

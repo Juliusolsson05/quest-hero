@@ -10,6 +10,7 @@ import type { NextFunction, Request, Response } from 'express';
 import { WebSocketServer, WebSocket } from 'ws';
 import type { ClientFrame, ServerFrame } from '../../shared/protocol';
 import { mountApi } from './api';
+import { mountPhoto } from './photo';
 import { startChatter } from './chatter';
 import { CONFIG } from './config';
 import { registerAgents, talk } from './dialogue';
@@ -28,6 +29,8 @@ import {
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '256kb' }));
+// Photo mode's dossier stream mounts first: mountApi ends in a catch-all.
+mountPhoto(app);
 mountApi(app);
 
 // malformed JSON bodies (and anything else express catches) → JSON {error}

@@ -15,6 +15,7 @@ import { HubLink } from './hublink';
 import { IrsEncounter } from './irs';
 import { Minimap } from './minimap';
 import { Multiplayer } from './mp';
+import { PhotoMode } from './photo';
 import { Player } from './player';
 import { initProps3d } from './props3d';
 import { StartScreen } from './start';
@@ -54,6 +55,7 @@ new TouchControls(player); // joystick + compact chrome on coarse-pointer device
 // A lid, not a gate: everything above already renders behind it from the
 // first frame, so the bar below reports asset streaming, not readiness.
 const start = new StartScreen(COARSE);
+const photo = new PhotoMode(player); // C — first-person camera, live building dossiers
 
 // ── multiplayer (worldplay4's Playroom stack): the URL is the invite link ──
 const mp = new Multiplayer(scene);
@@ -106,6 +108,7 @@ const island: IslandView = new IslandView(generatedIsland);
   scene.add(far.group);
   fx.attachDistance(far.layers);
   minimap.bind(island);
+  photo.bind(island); // every building on the map becomes a photographable subject
 }
 const spawnPos = generatedIsland.pois.find((p) => p.id === 'plaza')?.pos ?? { x: 52, y: 2, z: 43 };
 player.bindIsland(island, new THREE.Vector3(spawnPos.x + 1.4, spawnPos.y, spawnPos.z + 1.6));
@@ -183,9 +186,21 @@ function nearestPoiLabel(): string {
   return best;
 }
 
+// The viewfinder is exclusive: nothing else open behind it, and no
+// interaction prompts while the player is framing a shot.
+photo.onToggle = (on) => {
+  if (!on) return;
+  cartly.closePhone();
+  feed.close();
+  ui.closeQuests();
+  ui.closeTalk();
+  ui.setPrompt(null);
+};
+
 addEventListener('keydown', (e) => {
   if (e.code === 'Escape' && ui.questsOpen) ui.closeQuests();
   if (document.body.dataset.typing === '1') return;
+  if (photo.active) return; // the viewfinder owns the keyboard — see src/photo/
   if (e.code === 'KeyP') { cartly.togglePhone(nearestPoiLabel()); return; }
   if (e.code === 'KeyL') { feed.toggle(); return; }
   if (e.code === 'KeyE') interact();
@@ -241,8 +256,10 @@ renderer.setAnimationLoop(() => {
     );
   }
 
+  photo.update(); // what the lens is pointed at, ~12Hz
+
   // Interaction prompt: the first interactable with something to say wins.
-  if (document.body.dataset.typing !== '1') {
+  if (document.body.dataset.typing !== '1' && !photo.active) {
     let prompt: string | null = null;
     for (const i of interactables) { prompt = i.prompt(); if (prompt) break; }
     ui.setPrompt(prompt);
@@ -254,4 +271,7 @@ renderer.setAnimationLoop(() => {
       : entities.anchor(who));
 
   composer.render();
+  // The shutter reads the drawing buffer, which only holds this frame's pixels
+  // until the next one starts — so it fires here, right after the render.
+  photo.capture(renderer.domElement);
 });

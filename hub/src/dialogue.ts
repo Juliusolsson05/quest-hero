@@ -16,6 +16,7 @@
 import type { TrueForgeApi } from '@truefoundry/trueforge-sdk';
 import type { Emotion, Npc } from '../../shared/protocol';
 import { NPC_SEEDS, npcSeed, type NpcSeed } from './npcs';
+import { LENS_DEF } from './photo';
 import { SCRIBE_DEF } from './scribe';
 import { engagePlayer } from './sim';
 import {
@@ -70,7 +71,7 @@ const npcAgentDef = (seed: NpcSeed): AgentDef => ({
  */
 export async function registerAgents(): Promise<void> {
   let ok = 0;
-  for (const def of [...NPC_SEEDS.map(npcAgentDef), SCRIBE_DEF]) {
+  for (const def of [...NPC_SEEDS.map(npcAgentDef), SCRIBE_DEF, LENS_DEF]) {
     try {
       await ensureAgent(def);
       ok++;

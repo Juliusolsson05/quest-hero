@@ -27,6 +27,23 @@ const HUB_WS = (() => {
   return import.meta.env.VITE_HUB_WS ?? 'ws://localhost:7777/ws';
 })();
 
+/**
+ * The same hub over HTTP, for the calls that are a request and a stream rather
+ * than a world frame — photo dossiers (POST /api/photo). Derived from the
+ * socket URL so a `?hub=` override retargets both at once.
+ */
+export const HUB_HTTP = (() => {
+  try {
+    const u = new URL(HUB_WS);
+    u.protocol = u.protocol === 'wss:' ? 'https:' : 'http:';
+    u.pathname = u.pathname.replace(/\/ws\/?$/, '');
+    u.search = '';
+    return u.toString().replace(/\/$/, '');
+  } catch {
+    return 'http://localhost:7777';
+  }
+})();
+
 type Handler = (f: ServerFrame) => void;
 
 const RETRY_MIN = 1500;

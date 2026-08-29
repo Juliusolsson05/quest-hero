@@ -48,6 +48,9 @@ export class Cartly {
   }
 
   /** P key / phone button: raise or lower the glass, pickup label refreshed. */
+  /** Put the phone away — photo mode takes the whole screen. */
+  closePhone(): void { this.phone.close(); }
+
   togglePhone(fromLabel: string): void {
     this.phone.setFrom(fromLabel);
     this.phone.toggle();

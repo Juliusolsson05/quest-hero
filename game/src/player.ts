@@ -1,13 +1,14 @@
 import * as THREE from 'three';
 import type { AnimName } from '../../shared/protocol';
-import type { IslandView } from './world';
+import { SEA_Y, type IslandView } from './world';
 import { CharacterView } from './chars';
 
 /**
  * Third-person controller: the hero walks the island, a spring-arm camera
  * follows. Drag to orbit, wheel to zoom, WASD moves relative to the camera,
- * Shift runs. Collision is the island height grid — step up one block, never
- * into water — which is all a village stroll needs.
+ * Shift runs, Space hops. Collision is the island height grid — step up one
+ * block; walk into the sea and you swim, and the current turns you back before
+ * the world runs out.
  */
 export class Player {
   readonly camera: THREE.PerspectiveCamera;
@@ -15,6 +16,16 @@ export class Player {
   readonly pos = new THREE.Vector3();
   rot = 0;
   anim: AnimName = 'idle';
+  swimming = false;
+  /** False while something else owns the hero's pose — a cart ride. The sea
+   *  must not grab a passenger who is crossing the bridge above it. */
+  controlled = true;
+
+  /** Fired on the frame the hero hits the water, leaves it, and drifts out
+   *  far enough for the current to take hold. */
+  onEnterWater: ((x: number, z: number) => void) | null = null;
+  onLeaveWater: (() => void) | null = null;
+  onCurrent: (() => void) | null = null;
 
   private island: IslandView | null = null;
   private readonly keys = new Set<string>();
@@ -26,15 +37,41 @@ export class Player {
   private camDist = 7.5;
   private groundY = 2;
 
+  // Vertical state. `vy` only matters while airborne; on the ground the hero
+  // rides the height grid the way he always has.
+  private vy = 0;
+  private airborne = false;
+  private coyote = 0; // grace after walking off an edge
+  private buffer = 0; // grace for a jump pressed just before landing
+  private squashY = 1;
+  private t = 0;
+  private pushed = false; // already told about the current on this excursion
+
   private static readonly WALK = 3.4;
   private static readonly RUN = 6.4;
+  private static readonly SWIM = 2.2;   // water is heavy; you feel it
+  /** How deep the hero floats — the waterline crosses the torso. */
+  private static readonly SWIM_DEPTH = 0.45;
+  /** Climbing out: beaches and low shore, never a cliff face. */
+  private static readonly HAUL_OUT = 1.3;
+  // 9.8 against 30 puts the apex a block and a half up, feet back down at
+  // 0.65s: a hop with weight to it that never leaves the village silhouette.
+  private static readonly GRAVITY = 30;
+  private static readonly JUMP_V = 9.8;
+  private static readonly COYOTE = 0.12;
+  private static readonly BUFFER = 0.12;
 
   constructor(dom: HTMLElement) {
-    this.camera = new THREE.PerspectiveCamera(58, innerWidth / innerHeight, 0.1, 560);
+    this.camera = new THREE.PerspectiveCamera(58, innerWidth / innerHeight, 0.1, 900);
     this.view = new CharacterView('hero', 0xa8e6cf, 1.5);
 
     addEventListener('keydown', (e) => {
       if (document.body.dataset.typing === '1') return;
+      if (e.code === 'Space') {
+        e.preventDefault(); // otherwise the page scrolls under the canvas
+        this.buffer = Player.BUFFER;
+        return;
+      }
       this.keys.add(e.code);
     });
     addEventListener('keyup', (e) => this.keys.delete(e.code));
@@ -86,6 +123,8 @@ export class Player {
     this.pos.copy(spawn);
     this.groundY = island.heightAt(spawn.x, spawn.z);
     this.pos.y = this.groundY;
+    this.land();
+    this.buffer = 0;
   }
 
   /** Drop the hero somewhere else on the island (cart rides, cutscenes). */
@@ -95,9 +134,63 @@ export class Player {
       this.groundY = this.island.heightAt(to.x, to.z);
       this.pos.y = this.groundY;
     }
+    this.land();
+    this.buffer = 0;
+  }
+
+  private land(): void {
+    this.airborne = false;
+    this.vy = 0;
+  }
+
+  private isWater(x: number, z: number): boolean {
+    const island = this.island!;
+    return island.tileAt(x, z) === '~' || island.heightAt(x, z) < 1;
+  }
+
+  /**
+   * Open water is always enterable — walk off the sand, fall in off a jump,
+   * either way you end up swimming. Land is the island's one-block step rule
+   * when grounded; airborne that rule still holds (a hop never blocks what a
+   * stride allowed) plus anything you are now above; and swimming, you may
+   * only haul out onto shore close enough to the waterline to climb.
+   */
+  private passable(x: number, z: number): boolean {
+    const island = this.island!;
+    if (this.isWater(x, z)) return true;
+    // A wall is a wall whether you are walking, hauling out, or mid-jump.
+    if (island.blocked(this.pos.x, this.pos.z, x, z)) return false;
+    const h = island.heightAt(x, z);
+    if (this.swimming) return h <= SEA_Y + Player.HAUL_OUT;
+    if (!this.airborne) return island.walkable(x, z, island.heightAt(this.pos.x, this.pos.z));
+    return h - this.groundY <= 1 || h <= this.pos.y + 0.05;
+  }
+
+  /**
+   * Past the shore the current builds until it simply turns you around. A
+   * boundary you gave up on beats a boundary you bounced off.
+   */
+  private applyCurrent(dt: number): void {
+    if (!this.island || !this.swimming) return; // it is a sea current, not a leash
+    const c = this.island.island.size / 2;
+    const dx = this.pos.x - c, dz = this.pos.z - c;
+    const d = Math.hypot(dx, dz);
+    const soft = c + 22, hard = c + 30;
+    if (d <= soft) { this.pushed = false; return; }
+    if (!this.pushed) { this.pushed = true; this.onCurrent?.(); }
+
+    const pull = Math.min(1, (d - soft) / (hard - soft)) * Player.SWIM * 1.6 * dt;
+    this.pos.x -= (dx / d) * pull;
+    this.pos.z -= (dz / d) * pull;
+    if (d > hard) { // however hard you kick, this is the line
+      this.pos.x = c + (dx / d) * hard;
+      this.pos.z = c + (dz / d) * hard;
+    }
   }
 
   update(dt: number): void {
+    this.t += dt;
+    if (!this.controlled) { this.finish(dt); return; }
     let fwd = Number(this.keys.has('KeyW')) - Number(this.keys.has('KeyS'));
     let str = Number(this.keys.has('KeyD')) - Number(this.keys.has('KeyA'));
     let running = this.keys.has('ShiftLeft') || this.keys.has('ShiftRight');
@@ -109,32 +202,100 @@ export class Player {
     const moving = (fwd !== 0 || str !== 0) && this.island;
 
     if (moving && this.island) {
-      const speed = running ? Player.RUN : Player.WALK;
+      const speed = this.swimming ? Player.SWIM : running ? Player.RUN : Player.WALK;
       const dir = new THREE.Vector3(str, 0, -fwd)
         .normalize()
         .applyAxisAngle(new THREE.Vector3(0, 1, 0), this.camYaw);
       // Axis-separated moves so we slide along blocked tiles and walls instead
-      // of sticking; canMove also collides with building footprints.
+      // of sticking; passable() covers water, ledges and building footprints.
       const nx = this.pos.x + dir.x * speed * dt;
-      if (this.island.canMove(this.pos.x, this.pos.z, nx, this.pos.z)) this.pos.x = nx;
+      if (this.passable(nx, this.pos.z)) this.pos.x = nx;
       const nz = this.pos.z + dir.z * speed * dt;
-      if (this.island.canMove(this.pos.x, this.pos.z, this.pos.x, nz)) this.pos.z = nz;
+      if (this.passable(this.pos.x, nz)) this.pos.z = nz;
 
-      this.groundY = this.island.heightAt(this.pos.x, this.pos.z);
       const target = Math.atan2(dir.x, dir.z);
       // Shortest-path angle lerp so the hero turns, not spins.
       let d = target - this.rot;
       while (d > Math.PI) d -= Math.PI * 2;
       while (d < -Math.PI) d += Math.PI * 2;
       this.rot += d * Math.min(1, dt * 14);
-      this.anim = running ? 'run' : 'walk';
+      // The wire only speaks idle/walk/run; a swimmer reads as walking.
+      this.anim = this.swimming ? 'walk' : running ? 'run' : 'walk';
     } else {
       this.anim = 'idle';
     }
+    this.applyCurrent(dt);
+    if (this.island) this.groundY = this.island.heightAt(this.pos.x, this.pos.z);
 
-    // Smooth step up/down.
-    this.pos.y += (this.groundY - this.pos.y) * Math.min(1, dt * 12);
+    // ── in and out of the water ─────────────────────────────────────────────
+    // Falling in only counts once you reach the surface, so a jump over a
+    // channel stays a jump right up until it isn't.
+    const overWater = this.island ? this.isWater(this.pos.x, this.pos.z) : false;
+    if (overWater && !this.swimming && this.pos.y <= SEA_Y + 0.15) {
+      this.swimming = true;
+      this.airborne = false;
+      this.vy = 0;
+      this.squashY = 1;
+      this.onEnterWater?.(this.pos.x, this.pos.z);
+    } else if (!overWater && this.swimming) {
+      this.swimming = false;
+      this.onLeaveWater?.();
+    }
+    this.view.setSwimming(this.swimming);
 
+    // ── vertical ────────────────────────────────────────────────────────────
+    this.buffer = Math.max(0, this.buffer - dt);
+    if (this.swimming) {
+      // Float on the same swell the water tiles ride, so the hero bobs with
+      // the sea rather than sitting on a flat sheet of it.
+      const line = SEA_Y - Player.SWIM_DEPTH + Math.sin(this.t * 1.1) * 0.045;
+      this.pos.y += (line - this.pos.y) * Math.min(1, dt * 6);
+      this.buffer = 0; // no jumping out of the water
+      this.squashY += (1 - this.squashY) * Math.min(1, dt * 9);
+      this.view.root.scale.setScalar(1);
+      this.finish(dt);
+      return;
+    }
+
+    // Walking off a ledge starts a fall rather than a glide down the lerp.
+    if (!this.airborne && this.groundY < this.pos.y - 0.15) { this.airborne = true; this.vy = 0; }
+
+    // Flight resolves first, so a jump buffered mid-fall launches on the very
+    // frame the hero touches down.
+    if (this.airborne) {
+      this.vy -= Player.GRAVITY * dt;
+      this.pos.y += this.vy * dt;
+      if (this.vy <= 0 && this.pos.y <= this.groundY) {
+        const impact = -this.vy;
+        this.pos.y = this.groundY;
+        this.land();
+        this.squashY = 1 - THREE.MathUtils.clamp(impact * 0.022, 0, 0.22);
+      }
+    }
+    this.coyote = this.airborne ? Math.max(0, this.coyote - dt) : Player.COYOTE;
+
+    if (this.buffer > 0 && this.coyote > 0 && this.island) {
+      this.vy = Player.JUMP_V;
+      this.airborne = true;
+      this.coyote = 0;
+      this.buffer = 0;
+    } else if (!this.airborne) {
+      // Smooth step up/down.
+      this.pos.y += (this.groundY - this.pos.y) * Math.min(1, dt * 12);
+    }
+
+    // Squash and stretch: stretch with vertical speed, spring back off a
+    // landing. Cosmetic only — nothing else touches the hero's root scale.
+    const wantY = this.airborne ? 1 + THREE.MathUtils.clamp(this.vy * 0.028, -0.1, 0.13) : 1;
+    this.squashY += (wantY - this.squashY) * Math.min(1, dt * (this.airborne ? 16 : 9));
+    const flat = 1 / Math.sqrt(this.squashY); // keep the volume honest
+    this.view.root.scale.set(flat, this.squashY, flat);
+
+    this.finish(dt);
+  }
+
+  /** Pose the hero and settle the camera — the tail of every frame. */
+  private finish(dt: number): void {
     this.view.setAnim(this.anim);
     this.view.update(dt);
     this.view.root.position.copy(this.pos);

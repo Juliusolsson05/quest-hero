@@ -73,6 +73,12 @@ const TECH_STYLES: Record<string, TechStyle> = {
   // angel: gray fleece vest, silver hair, sunglasses that never come off
   marcus: { top: 0xb0b4bd, shirt: 0xfdfaf2, pants: 0x46474f, shoes: 0x8a6742,
             hair: 0xd8dde2, skin: 0xe0b68f, headgear: 'silver', sunglasses: true },
+  // markets guy: deep-green puffer vest over a white quarter-zip, gray slacks.
+  // Deliberately a colder, flatter palette than Chad's navy-and-khaki: they
+  // share the 'investor' build, so colour is the only thing telling them apart
+  // across the square.
+  preston: { top: 0x2f5d50, shirt: 0xf4f6f5, pants: 0x767b85, shoes: 0x2e3138,
+             hair: 0x4b3a2a, skin: 0xf7dbb5, headgear: 'slick' },
 };
 
 const LOOK_DEFAULTS: Record<Exclude<NpcLook, 'villager'>, TechStyle> = {
@@ -95,6 +101,13 @@ export class CharacterView {
   private extras: { phone?: THREE.Group; phoneY?: number;
                     hands?: THREE.Mesh[]; handY?: number;
                     sipArm?: THREE.Group } = {};
+
+  /** Swim rig: legs to kick with, arms that exist only while in the water. */
+  private legs: THREE.Object3D[] = [];
+  private rig: THREE.Object3D | null = null;   // the GLB, once it lands
+  private swimTint = 0xa8e6cf;
+  private swimArms: THREE.Group[] = [];
+  private swimming = false;
 
   constructor(readonly id: string, tint: number, readonly height = 1.5,
               readonly look: NpcLook = 'villager') {
@@ -126,8 +139,11 @@ export class CharacterView {
   private buildVillager(tint: number): void {
     const g = new THREE.Group();
     const { mk } = this.mkInto(g);
-    mk(0.2, 0.3, 0.24, 0x5a5566, -0.15, 0.15, 0);   // legs
-    mk(0.2, 0.3, 0.24, 0x5a5566, 0.15, 0.15, 0);
+    this.legs = [
+      mk(0.2, 0.3, 0.24, 0x5a5566, -0.15, 0.15, 0),  // legs
+      mk(0.2, 0.3, 0.24, 0x5a5566, 0.15, 0.15, 0),
+    ];
+    this.swimTint = tint;
     mk(0.62, 0.55, 0.4, tint, 0, 0.58, 0);           // body
     mk(0.5, 0.16, 0.34, tint, 0, 0.3, 0);            // lil skirt/hem
     const head = this.buildHead(g, 0xffe8cf);
@@ -162,8 +178,11 @@ export class CharacterView {
     // sneakers + pants
     mk(0.22, 0.12, 0.3, s.shoes, -0.15, 0.06, 0.03);
     mk(0.22, 0.12, 0.3, s.shoes, 0.15, 0.06, 0.03);
-    mk(0.2, 0.26, 0.24, s.pants, -0.15, 0.27, 0);
-    mk(0.2, 0.26, 0.24, s.pants, 0.15, 0.27, 0);
+    this.legs = [
+      mk(0.2, 0.26, 0.24, s.pants, -0.15, 0.27, 0),
+      mk(0.2, 0.26, 0.24, s.pants, 0.15, 0.27, 0),
+    ];
+    this.swimTint = s.top;
 
     const vest = look === 'investor' || s.shirt !== undefined;
     const sleeve = vest ? s.shirt! : s.top;
@@ -325,10 +344,48 @@ export class CharacterView {
 
       if (this.body) this.root.remove(this.body);
       this.body = null;
+      this.rig = scene;
       this.root.add(scene);
     } catch (err) {
       console.warn(`GLB upgrade failed for ${this.id}, keeping placeholder`, err);
     }
+  }
+
+  /**
+   * Enter or leave the water. Arms are built on the way in and thrown away on
+   * the way out: the placeholder body has none, and every villager NPC shares
+   * that build — so a permanent pair would change silhouettes island-wide for
+   * the sake of one swimmer.
+   */
+  setSwimming(on: boolean): void {
+    if (on === this.swimming) return;
+    this.swimming = on;
+    const host = this.body ?? this.rig;
+
+    if (on) {
+      if (this.body) {
+        for (const side of [-1, 1]) {
+          const arm = new THREE.Group();
+          const m = new THREE.Mesh(
+            shadedBox(0.16, 0.46, 0.16),
+            new THREE.MeshStandardMaterial({ color: this.swimTint, vertexColors: true, roughness: 0.85 }),
+          );
+          m.position.y = -0.23; // hangs from the shoulder, which is the pivot
+          m.castShadow = true;
+          arm.add(m);
+          arm.position.set(side * 0.38, 0.78, 0);
+          this.body.add(arm);
+          this.swimArms.push(arm);
+        }
+      }
+      return;
+    }
+
+    for (const arm of this.swimArms) arm.parent?.remove(arm);
+    this.swimArms = [];
+    if (host) { host.rotation.set(0, 0, 0); host.position.set(0, 0, 0); }
+    for (const leg of this.legs) leg.rotation.x = 0;
+    if (this.head) this.head.rotation.set(0, 0, 0);
   }
 
   setAnim(a: AnimName): void {
@@ -346,6 +403,24 @@ export class CharacterView {
 
   update(dt: number): void {
     this.t += dt;
+
+    if (this.swimming) {
+      const k = this.t * 3.6;                        // one stroke per ~1.7s
+      const host = this.body ?? this.rig;
+      if (host) {
+        host.rotation.x = -1.15;                     // along the surface, face down
+        host.rotation.z = Math.sin(k) * 0.22;        // roll into each stroke
+        host.position.set(0, 0.1 + Math.sin(k * 2) * 0.03, -0.45);
+      }
+      for (const [i, leg] of this.legs.entries())    // flutter kick
+        leg.rotation.x = Math.sin(k * 2 + i * Math.PI) * 0.45;
+      for (const [i, arm] of this.swimArms.entries())
+        arm.rotation.x = -(k + i * Math.PI);         // front crawl, arms opposed
+      if (this.head) this.head.rotation.x = 0.92 + Math.sin(k) * 0.1; // chin up to breathe
+      if (this.mixer) this.mixer.update(dt);
+      return;
+    }
+
     if (this.mixer) { this.mixer.update(dt); return; }
     // Procedural kawaii: bob + rock, stronger when moving.
     const b = this.body!;

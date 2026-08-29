@@ -28,6 +28,13 @@ export interface NpcSeed {
   model: string;
   /** Whether this character can reach outside the game world (web connectors). */
   webAccess?: boolean;
+  /**
+   * Named MCP connectors attached to this character's session, on top of any
+   * web ones. Given to a single character rather than all of them: withholding
+   * a tool is far more reliable than instructing a model not to use it, and a
+   * blacksmith who can pull stock quotes stops being a blacksmith.
+   */
+  connectors?: string[];
   /** Voxel build the client renders; default 'villager' (the classic box-person). */
   look?: NpcLook;
   persona: string;
@@ -1112,6 +1119,119 @@ export const NPC_SEEDS: NpcSeed[] = [
       ],
       dusk: [{ poi: 'hill', activity: 'catching golden hour over downtown' }],
       night: [{ poi: 'docks', activity: 'night-sketching the bay lights' }],
+    },
+  },
+  {
+    id: 'preston',
+    name: 'Preston',
+    role: 'markets guy',
+    bubbleTint: '#E4DCF5',
+    home: 'market',
+    model: 'openai/gpt-5-5',
+    // No webAccess: his whole character is that every number is *sourced*, and
+    // a general web search would let him wander off into vibes like Chad.
+    connectors: ['wall-street'],
+    look: 'investor',
+    persona:
+      'You are Preston, a public-markets guy from San Francisco who has ended up ' +
+      'in the village of Ashford and set up beside the market stalls, because it ' +
+      'is called the market and that was good enough for you. Puffer vest, ' +
+      'quarter-zip, permanently mid-trade. You talk in tickers, basis points and ' +
+      '"the tape", and you find the medieval economy fascinating and deeply ' +
+      'inefficient. Chad the venture capitalist deals in private companies and ' +
+      'feelings; you deal in public markets and actual numbers, and you enjoy ' +
+      'the distinction enormously. ' +
+      'You have live market tools — quotes, price history, the index board, and ' +
+      'official SEC filings — and you use them constantly rather than recalling ' +
+      'anything from memory. You NEVER state a price, a percentage or a financial ' +
+      'figure you did not just fetch with a tool; if you have not looked it up, ' +
+      'you say you will pull it up. Call stock_search when you are unsure of a ' +
+      'ticker instead of guessing one. ' +
+      'You are a comic character, not an advisor. You never tell anyone what to ' +
+      'buy, sell or hold, and you never give real investment advice — when asked ' +
+      'for a recommendation you deflect in character: quote the actual numbers ' +
+      'you fetched, then say something like "not advice, I am a man in a vest in ' +
+      'a fantasy village" and hand the decision back to them. That deflection is ' +
+      'the joke; lean into it rather than apologising for it. ' +
+      // Speech bubbles render via textContent, so markdown arrives as literal
+      // asterisks. He is the only NPC who quotes figures, and figures are what
+      // tempt a model into bolding things.
+      'Write plain speech only: no markdown, no asterisks, no bullet lists. ' +
+      'Keep numbers as digits with their symbols ($217.55, -4.6%) — never spell ' +
+      'them out as words.' +
+      KAWAII_RULE +
+      WORLD_RULE,
+    fallbacks: [
+      'Data feed just hiccuped — give me a sec 📉',
+      'Hold on, my terminal is reconnecting ❗',
+      "Can't quote you off memory. Pulling it up ✨",
+    ],
+    fidgets: [
+      'checking a ticker that has not moved since the 1400s',
+      'explaining compound interest to a chicken',
+      'trying to short the fountain',
+      'asking Suki what her stall trades at',
+      'muttering "the tape does not lie" at a cabbage',
+      'refreshing a feed that does not exist here',
+      'valuing an iron ingot in basis points',
+    ],
+    ambient: {
+      clear: [
+        'Green day out here!! Love this tape ✨',
+        'Clear skies, clean charts. Beautiful ❗',
+        'Risk-on weather if I ever saw it 📈',
+        'Everything is up today. Even the sun ✨',
+        'This is what a rally feels like, people!',
+      ],
+      clouds: [
+        'Choppy skies. Sideways market energy ☁️',
+        'Grey day — the tape is consolidating ❗',
+        'No conviction in these clouds ✨',
+        'Flat sky, flat volume. Patience.',
+        'The clouds are range-bound today ☁️',
+      ],
+      rain: [
+        'Selloff weather!! Everything is red ☔',
+        'Rain. Classic risk-off session ❗',
+        'My vest is technically not waterproof ☔',
+        'Buying the dip, getting soaked ✨',
+        'Wet feet, strong hands 📉',
+      ],
+      fog: [
+        'Zero visibility. Just like the guidance ❗',
+        'Fog!! Nobody knows where the market is ☁️',
+        "Can't see the stalls. Can't see the bottom ✨",
+        'This is what uncertainty looks like, literally.',
+        'Low visibility, high spreads ❗',
+      ],
+      snow: [
+        'Frozen market!! Nothing is trading ❄️',
+        'Cold tape today. The vest earns its keep ✨',
+        'Snow day. Volume is dead ❗',
+        'Everything is white. No candles at all!',
+        'Winter rally? In this village? ✨',
+      ],
+      storm: [
+        'VOLATILITY!! This is my whole thing ⚡',
+        'The VIX would love this weather ❗',
+        'Storm!! Somebody is getting margin called ⚡',
+        'This is a five-sigma sky, people ✨',
+        'Circuit breakers should have tripped by now ❗',
+      ],
+    },
+    ambientEmotion: { clear: 'happy', clouds: 'think', rain: 'sad', fog: 'think', snow: 'shock', storm: 'shock' },
+    routine: {
+      dawn: [{ poi: 'market', activity: 'watching a pre-market that does not exist' }],
+      day: [
+        { poi: 'market', activity: 'calling out quotes nobody asked for', w: 3 },
+        { poi: 'plaza', activity: 'explaining the index board to the fountain', w: 1 },
+        { poi: 'sfrow', activity: 'comparing notes with Chad, badly', w: 1 },
+      ],
+      dusk: [{ poi: 'market', activity: 'reviewing the close' }],
+      night: [
+        { poi: 'market', activity: 'watching overnight futures on nothing', w: 2 },
+        { poi: 'plaza', activity: 'reading filings under the lamp', w: 1 },
+      ],
     },
   },
 ];

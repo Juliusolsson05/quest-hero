@@ -18,10 +18,12 @@ export class Player {
 
   private island: IslandView | null = null;
   private readonly keys = new Set<string>();
+  private readonly pointers = new Map<number, { x: number; y: number }>();
+  private readonly mobileMove = new THREE.Vector2();
+  private pinchDist = 0;
   private camYaw = Math.PI * 0.85;
   private camPitch = 0.52;
   private camDist = 7.5;
-  private dragging = false;
   private groundY = 2;
 
   private static readonly WALK = 3.4;
@@ -36,20 +38,47 @@ export class Player {
       this.keys.add(e.code);
     });
     addEventListener('keyup', (e) => this.keys.delete(e.code));
-    addEventListener('blur', () => this.keys.clear());
+    addEventListener('blur', () => { this.keys.clear(); this.pointers.clear(); });
 
+    // Camera pointers, per-id so a joystick thumb never fights the orbit
+    // finger: one canvas pointer orbits, two pinch-zoom. Client deltas, not
+    // movementX — iOS reports zero movement on touch pointer events.
     dom.addEventListener('pointerdown', (e) => {
-      if (e.button === 0) { this.dragging = true; dom.setPointerCapture(e.pointerId); }
+      if (e.button !== 0) return;
+      this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      dom.setPointerCapture(e.pointerId);
+      if (this.pointers.size === 2) {
+        const [a, b] = [...this.pointers.values()];
+        this.pinchDist = Math.hypot(a.x - b.x, a.y - b.y);
+      }
     });
-    addEventListener('pointerup', () => { this.dragging = false; });
+    const drop = (e: PointerEvent) => this.pointers.delete(e.pointerId);
+    addEventListener('pointerup', drop);
+    addEventListener('pointercancel', drop);
     addEventListener('pointermove', (e) => {
-      if (!this.dragging) return;
-      this.camYaw -= e.movementX * 0.0055;
-      this.camPitch = THREE.MathUtils.clamp(this.camPitch + e.movementY * 0.004, 0.12, 1.25);
+      const p = this.pointers.get(e.pointerId);
+      if (!p) return;
+      const mx = e.clientX - p.x, my = e.clientY - p.y;
+      p.x = e.clientX;
+      p.y = e.clientY;
+      if (this.pointers.size >= 2) {
+        const [a, b] = [...this.pointers.values()];
+        const d = Math.hypot(a.x - b.x, a.y - b.y);
+        this.camDist = THREE.MathUtils.clamp(this.camDist - (d - this.pinchDist) * 0.02, 3.5, 18);
+        this.pinchDist = d;
+        return;
+      }
+      this.camYaw -= mx * 0.0055;
+      this.camPitch = THREE.MathUtils.clamp(this.camPitch + my * 0.004, 0.12, 1.25);
     });
     addEventListener('wheel', (e) => {
       this.camDist = THREE.MathUtils.clamp(this.camDist + Math.sign(e.deltaY) * 0.8, 3.5, 18);
     }, { passive: true });
+  }
+
+  /** Analog stick input from TouchControls: x right, y down, each -1..1. */
+  setMobileMove(x: number, y: number): void {
+    this.mobileMove.set(x, y);
   }
 
   bindIsland(island: IslandView, spawn: THREE.Vector3): void {
@@ -69,9 +98,14 @@ export class Player {
   }
 
   update(dt: number): void {
-    const fwd = Number(this.keys.has('KeyW')) - Number(this.keys.has('KeyS'));
-    const str = Number(this.keys.has('KeyD')) - Number(this.keys.has('KeyA'));
-    const running = this.keys.has('ShiftLeft') || this.keys.has('ShiftRight');
+    let fwd = Number(this.keys.has('KeyW')) - Number(this.keys.has('KeyS'));
+    let str = Number(this.keys.has('KeyD')) - Number(this.keys.has('KeyA'));
+    let running = this.keys.has('ShiftLeft') || this.keys.has('ShiftRight');
+    if (this.mobileMove.lengthSq() > 0.02) { // the touch joystick wins when held
+      str = this.mobileMove.x;
+      fwd = -this.mobileMove.y; // stick up = forward
+      running = this.mobileMove.length() > 0.82;
+    }
     const moving = (fwd !== 0 || str !== 0) && this.island;
 
     if (moving && this.island) {
@@ -115,9 +149,14 @@ export class Player {
     ).multiplyScalar(this.camDist);
     const wanted = target.clone().add(off);
     if (this.island) {
-      // Pull in when a building would occlude the hero…
+      // When a building would occlude the hero, pull in — but never far enough
+      // to end up inside the wall. Past halfway the camera climbs instead, so
+      // a hero hard against a row house is filmed over the rooftop.
       const t = this.island.cameraClearT(target, wanted);
-      if (t < 1) wanted.lerpVectors(target, wanted, Math.max(0.14, t));
+      if (t < 1) {
+        wanted.lerpVectors(target, wanted, Math.max(0.42, t));
+        if (t < 0.75) wanted.y += ((0.75 - t) / 0.75) * 6.5;
+      }
       // …and keep the camera above the terrain skin.
       const ch = this.island.heightAt(wanted.x, wanted.z);
       wanted.y = Math.max(wanted.y, ch + 0.6);

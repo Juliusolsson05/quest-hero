@@ -19,9 +19,11 @@ import { CartlyPhone } from './cartly';
 import { CityFeed } from './feed';
 import { Minimap } from './minimap';
 import { Multiplayer } from './mp';
+import { TouchControls } from './touch';
 
+const COARSE = matchMedia('(pointer: coarse)').matches;
 const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setPixelRatio(Math.min(devicePixelRatio, COARSE ? 1.75 : 2)); // phone GPUs breathe easier
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -39,6 +41,7 @@ const ui = new Ui();
 const phone = new CartlyPhone();
 const feed = new CityFeed();
 const minimap = new Minimap();
+new TouchControls(player); // joystick + compact chrome on coarse-pointer devices
 
 // ── multiplayer (worldplay4's Playroom stack): the URL is the invite link ──
 const mp = new Multiplayer(scene);
@@ -213,16 +216,21 @@ function nearestPoiLabel(): string {
   return best;
 }
 
+/** The E action — also fired by tapping the interaction pill on touch. */
+function interact(): void {
+  if (carts.nearCart()) { carts.board(); phone.close(); return; }
+  const npc = entities.nearestNpc(player.pos, 3.4);
+  if (npc) { ui.openTalk(npc.id, `${npc.name} · ${npc.role}`); return; }
+  if (boardPos && boardPos.distanceTo(player.pos) < 3.2) ui.openQuests();
+}
+ui.onPromptTap = interact;
+
 addEventListener('keydown', (e) => {
   if (e.code === 'Escape' && ui.questsOpen) ui.closeQuests();
   if (document.body.dataset.typing === '1') return;
   if (e.code === 'KeyP') { phone.setFrom(nearestPoiLabel()); phone.toggle(); return; }
   if (e.code === 'KeyL') { feed.toggle(); return; }
-  if (e.code !== 'KeyE') return;
-  if (carts.nearCart()) { carts.board(); phone.close(); return; }
-  const npc = entities.nearestNpc(player.pos, 3.4);
-  if (npc) { ui.openTalk(npc.id, `${npc.name} · ${npc.role}`); return; }
-  if (boardPos && boardPos.distanceTo(player.pos) < 3.2) ui.openQuests();
+  if (e.code === 'KeyE') interact();
 });
 
 // Pose uplink at 10Hz.
@@ -231,7 +239,12 @@ setInterval(() => {
 }, 100);
 
 const startEl = document.getElementById('start')!;
-startEl.addEventListener('click', () => startEl.classList.add('hidden'));
+startEl.addEventListener('pointerdown', () => startEl.classList.add('hidden')); // tap or click
+if (COARSE) {
+  startEl.querySelector('.keys')!.textContent =
+    'left stick to stroll (push far to run) · drag to look · pinch to zoom · tap the pill to talk';
+  startEl.querySelector('.go')!.textContent = 'tap to step off the cable car ✨';
+}
 
 addEventListener('resize', () => {
   player.camera.aspect = innerWidth / innerHeight;

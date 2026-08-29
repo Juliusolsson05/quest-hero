@@ -22,6 +22,8 @@ export class Ui {
 
   onSay: (npcId: string, text: string) => void = () => {};
   onAccept: (questId: string) => void = () => {};
+  /** Tapping the interaction pill = pressing E (the touch path). */
+  onPromptTap: () => void = () => {};
 
   constructor() {
     document.body.insertAdjacentHTML('beforeend', `
@@ -59,6 +61,7 @@ export class Ui {
       }
     });
     this.questPanel.querySelector('.q-close')!.addEventListener('click', () => this.closeQuests());
+    this.prompt.addEventListener('click', () => this.onPromptTap());
 
     // Clicking anywhere outside a panel dismisses it — no hunting for ✕ / Esc.
     document.addEventListener('pointerdown', (e) => {

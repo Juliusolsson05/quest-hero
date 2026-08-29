@@ -57,7 +57,7 @@ export const NPCS: NpcDef[] = [
     id: 'herald',
     name: 'Wren',
     role: 'town herald',
-    position: [-4, 4],
+    position: [-1.6, 3.9],
     color: 0x6aa9d0,
     model: 'openai/gpt-5-5',
     webAccess: true,

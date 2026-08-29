@@ -22,7 +22,8 @@ interface WorldEvent { id: number; at: number; type: string; actor?: string;
 // quest.step quest.completed commit.landed player.joined player.said mcp.custom
 
 interface Npc    { id: string; name: string; role: string; pos: Vec3; activity: string;
-                   mood: Emotion; persona: string }
+                   mood: Emotion; persona: string;
+                   look?: 'villager'|'techbro-phone'|'techbro-laptop'|'investor' }
 interface WObject{ id: string; kind: string; pos: Vec3; spawnedBy: string; expiresAt?: number }
 interface Quest  { id: string; title: string; pitch: string; giver: string;
                    source: {type:'headline'|'handcrafted'|'mcp'; ref?: string};
@@ -64,6 +65,8 @@ interface World  { time: {phase:TimePhase; hour:number; real:boolean};
 | `POST /api/events` | `{summary, data?}` | inject a custom event (`mcp.custom`) — NPCs will see it in their next `[WORLD NOW]` digest and can gossip about it |
 | `POST /api/player/give` | `{item, n?}` | grant inventory (behind your MCP approval gate!) |
 | `POST /api/npcs/:id/talk` | `{text, from?}` | full agent turn via TrueForge; responds `{conversationId}`, reply streams over WS + lands as `npc.said` event. MCP callers who just want text can poll `GET /api/conversations/:id` → `{done, text}` |
+| `POST /api/chatter` | `{a?, b?}` (npc ids; omit to auto-pick) | start an NPC↔NPC conversation NOW about this week's real SF/tech news (Reporter agent w/ tavily + sf-guide → Playwright script → alternating bubbles in-world). 400 if one is already running |
+| `GET /api/chatter` | — | chatter status: `{running, lastTopic, nextInS, newsAgeS, newsItems}` (read table, listed here for locality) |
 
 Errors: `4xx {error: string}`. Unknown `kind`/`poi`/ids → `400` with the allowed values listed.
 

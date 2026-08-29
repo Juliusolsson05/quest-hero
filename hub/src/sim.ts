@@ -140,6 +140,48 @@ export function sendNpcTo(npcId: string, poiId: string): Npc | undefined {
   return rt.npc;
 }
 
+// ── NPC↔NPC chatter choreography (used by chatter.ts) ──────────────────────
+
+/** Walk `a` over to `b`; `b` waits in place. Returns false if either is unknown. */
+export function summonForChat(aId: string, bId: string): boolean {
+  const ra = npcRts.find((r) => r.npc.id === aId);
+  const rb = npcRts.find((r) => r.npc.id === bId);
+  if (!ra || !rb) return false;
+  rb.target = null;
+  rb.forced = null;
+  rb.dwellUntil = Date.now() + 40_000; // long enough for the walk over
+  ra.forced = null;
+  ra.stop = null;
+  ra.dwellUntil = 0;
+  ra.target = randomWalkableNear(rb.npc.pos.x, rb.npc.pos.z, 1.3);
+  setActivity(ra.npc, `heading over to ${rb.npc.name}`);
+  return true;
+}
+
+/** Park both for the conversation: no wandering, facing each other. */
+export function holdFacing(aId: string, bId: string, holdMs: number): void {
+  const ra = npcRts.find((r) => r.npc.id === aId);
+  const rb = npcRts.find((r) => r.npc.id === bId);
+  if (!ra || !rb) return;
+  const until = Date.now() + holdMs;
+  for (const [me, other] of [[ra, rb], [rb, ra]] as const) {
+    me.target = null;
+    me.forced = null;
+    me.dwellUntil = until;
+    me.npc.anim = 'idle';
+    me.npc.rot = Math.atan2(other.npc.pos.x - me.npc.pos.x, other.npc.pos.z - me.npc.pos.z);
+    setActivity(me.npc, `chatting with ${other.npc.name}`);
+  }
+}
+
+/** Let a pair drift back to their routines shortly after a conversation. */
+export function releaseFromChat(ids: string[]): void {
+  for (const id of ids) {
+    const rt = npcRts.find((r) => r.npc.id === id);
+    if (rt) rt.dwellUntil = Date.now() + rand(2_000, 6_000);
+  }
+}
+
 // ── animals ─────────────────────────────────────────────────────────────────
 
 interface ChickenRt {

@@ -10,6 +10,7 @@ import type { NextFunction, Request, Response } from 'express';
 import { WebSocketServer, WebSocket } from 'ws';
 import type { ClientFrame, ServerFrame } from '../../shared/protocol';
 import { mountApi } from './api';
+import { startChatter } from './chatter';
 import { CONFIG } from './config';
 import { talk } from './dialogue';
 import { startIngest } from './ingest';
@@ -92,4 +93,5 @@ server.listen(CONFIG.port, () => {
   console.log(`[hub] TrueForge at ${CONFIG.trueforgeBase} · GitHub repo ${CONFIG.githubRepo}`);
   startSim();
   startIngest();
+  startChatter();
 });

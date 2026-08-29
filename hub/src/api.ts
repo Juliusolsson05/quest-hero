@@ -5,6 +5,7 @@
  */
 import type { Express, Request, Response } from 'express';
 import type { Emotion, ObjectKind, Quest, TimePhase, Vec3, WeatherKind } from '../../shared/protocol';
+import { chatterStatus, forceChatter } from './chatter';
 import { getConversation, talk, validateSteps } from './dialogue';
 import { heightAt, island, NEAR_TARGETS, poi, POI_IDS, randomWalkableNear } from './island';
 import { overrideTime, overrideWeather, resumeAutoWeather, resumeRealTime } from './ingest';
@@ -102,7 +103,19 @@ export function mountApi(app: Express): void {
     res.json(conv);
   });
 
+  app.get('/api/chatter', (_req, res) => res.json(chatterStatus()));
+
   // ── write ─────────────────────────────────────────────────────────────────
+
+  app.post('/api/chatter', (req, res) => {
+    const { a, b } = (req.body ?? {}) as { a?: string; b?: string };
+    if ((a && !getNpc(a)) || (b && !getNpc(b))) {
+      return missing(res, `unknown npc — allowed: ${listNpcs().map((n) => n.id).join(', ')}`);
+    }
+    const started = forceChatter(a, b);
+    if (!started) return bad(res, 'a conversation is already running (GET /api/chatter)');
+    res.json({ started, note: 'news + script are generating; bubbles begin in ~5-20s' });
+  });
 
   app.post('/api/npcs/:id/say', (req, res) => {
     const npc = getNpc(req.params.id);

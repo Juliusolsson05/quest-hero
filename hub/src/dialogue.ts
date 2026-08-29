@@ -58,7 +58,7 @@ async function configuredModels(): Promise<string[]> {
 
 /** env TRUEFORGE_MODEL wins; else the NPC's preference if configured; else the
  *  first catalog entry; an empty catalog routes straight to canned fallbacks. */
-async function resolveModel(preferred?: string): Promise<string> {
+export async function resolveModel(preferred?: string): Promise<string> {
   if (CONFIG.trueforgeModel) return CONFIG.trueforgeModel;
   const names = await configuredModels();
   if (preferred && names.includes(preferred)) return preferred;
@@ -76,16 +76,15 @@ const WEB_CONNECTORS = ['bright-data', 'tavily', 'exa', 'parallel-web'];
 
 let connectorCache: { at: number; names: string[] } | null = null;
 
-async function webConnectors(): Promise<string[]> {
+/** Every authenticated connector TrueForge has configured (unfiltered). */
+async function configuredConnectors(): Promise<string[]> {
   if (connectorCache && Date.now() - connectorCache.at < 60_000) return connectorCache.names;
   const res = await fetch(`${BASE}/api/v1/mcp-servers`, { signal: AbortSignal.timeout(5_000) });
   if (!res.ok) throw new HarnessUnavailable(`connectors: ${res.status}`);
   const body = (await res.json()) as { data?: { name?: string; auth_status?: { status?: string } }[] };
   const names = (body?.data ?? [])
-    .filter((s) => s.name && WEB_CONNECTORS.includes(s.name))
-    .filter((s) => (s.auth_status?.status ?? 'authenticated') === 'authenticated')
-    .map((s) => s.name!)
-    .sort((a, b) => WEB_CONNECTORS.indexOf(a) - WEB_CONNECTORS.indexOf(b));
+    .filter((s) => s.name && ['authenticated', 'not_required'].includes(s.auth_status?.status ?? 'authenticated'))
+    .map((s) => s.name!);
   connectorCache = { at: Date.now(), names };
   return names;
 }
@@ -94,21 +93,32 @@ async function webConnectors(): Promise<string[]> {
 
 const sessions = new Map<string, string>();
 
-interface SessionSpec {
+export interface SessionSpec {
   persona: string;
   model?: string;
   webAccess?: boolean;
+  /** Extra MCP connector names to attach verbatim (deduped against webAccess
+   *  ones; silently dropped if TrueForge doesn't have them configured). */
+  connectors?: string[];
 }
 
-async function sessionFor(key: string, spec: SessionSpec, signal: AbortSignal): Promise<string> {
+export async function sessionFor(key: string, spec: SessionSpec, signal: AbortSignal): Promise<string> {
   const existing = sessions.get(key);
   if (existing) return existing;
 
   const model = await resolveModel(spec.model);
   let connectors: string[] = [];
-  if (spec.webAccess) {
+  if (spec.webAccess || spec.connectors?.length) {
     try {
-      connectors = await webConnectors();
+      const configured = await configuredConnectors();
+      if (spec.webAccess) {
+        connectors = configured
+          .filter((n) => WEB_CONNECTORS.includes(n))
+          .sort((a, b) => WEB_CONNECTORS.indexOf(a) - WEB_CONNECTORS.indexOf(b));
+      }
+      for (const want of spec.connectors ?? []) {
+        if (configured.includes(want) && !connectors.includes(want)) connectors.push(want);
+      }
     } catch {
       warnOnce('trueforge-mcp', '[dialogue] could not list TrueForge mcp-servers — talking without web tools');
     }
@@ -149,7 +159,7 @@ interface ToolCallAcc {
   bubbled: boolean;
 }
 
-interface TurnCallbacks {
+export interface TurnCallbacks {
   onDelta: (chunk: string) => void;
   /** one badge per real tool call: name or "tool: query…" once args parse */
   onTool?: (label: string) => void;
@@ -167,7 +177,7 @@ function toolDetail(c: ToolCallAcc): string | null {
   }
 }
 
-async function streamTurn(sessionId: string, content: string, cb: TurnCallbacks, signal: AbortSignal): Promise<void> {
+export async function streamTurn(sessionId: string, content: string, cb: TurnCallbacks, signal: AbortSignal): Promise<void> {
   const res = await fetch(`${BASE}/api/v1/sessions/${sessionId}/turns?stream=true`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', accept: 'text/event-stream' },

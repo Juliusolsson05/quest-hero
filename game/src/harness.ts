@@ -109,14 +109,45 @@ async function sessionFor(npc: NpcDef): Promise<string> {
   return id;
 }
 
+/** What the dialogue box needs to know about a turn as it happens. */
+export type TurnEvent =
+  | { kind: 'text'; text: string }
+  | { kind: 'connect'; servers: string[] }
+  | { kind: 'tool'; id: string; name: string; detail: string; system: boolean; done: boolean };
+
 /**
- * Sends one player line and yields text as it arrives, so dialogue types out
- * instead of appearing after a silent pause. onDelta is called per chunk.
+ * Turns `call_tool`'s streamed argument JSON into something a player can read.
+ *
+ * Arguments arrive as string fragments across many deltas, so this is called
+ * repeatedly with a partial buffer and must tolerate invalid JSON rather than
+ * throw — the detail simply sharpens as more of the argument arrives.
+ */
+function describeArgs(args: string): string {
+  try {
+    const o = JSON.parse(args);
+    // The harness wraps MCP calls: the tool the player cares about is named
+    // inside the arguments, not in the function name.
+    const tool = o.tool ?? o.name ?? o.tool_name;
+    const query = o.query ?? o.arguments?.query ?? o.args?.query ?? o.input;
+    if (tool && query) return `${tool}: ${String(query).slice(0, 60)}`;
+    if (tool) return String(tool);
+    if (query) return String(query).slice(0, 60);
+  } catch {
+    // Partial JSON mid-stream is expected, not an error.
+  }
+  return '';
+}
+
+/**
+ * Sends one player line and reports the turn as it unfolds — text, MCP
+ * connections, and every tool call with its result. The dialogue box renders
+ * all of it, because an agent that visibly reaches for a tool is far more
+ * legible than one that pauses and then knows things.
  */
 export async function say(
   npc: NpcDef,
   line: string,
-  onDelta: (text: string) => void,
+  onEvent: (e: TurnEvent) => void,
 ): Promise<void> {
   const id = await sessionFor(npc);
   const res = await fetch(`${BASE}/api/v1/sessions/${id}/turns?stream=true`, {
@@ -128,6 +159,8 @@ export async function say(
 
   const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
   let buffer = '';
+  const calls = new Map<string, { name: string; args: string; system_type?: string }>();
+  const byIndex = new Map<number, string>();
   for (;;) {
     const { value, done } = await reader.read();
     if (done) break;
@@ -141,7 +174,44 @@ export async function say(
       if (!data || data === '[DONE]') continue;
       try {
         const evt = JSON.parse(data);
-        if (evt.type === 'model.message.delta' && evt.content) onDelta(evt.content);
+
+        if (evt.type === 'mcp.initialize') {
+          const servers = (evt.mcp_servers ?? []).map((s: { name: string }) => s.name);
+          if (servers.length) onEvent({ kind: 'connect', servers });
+        }
+
+        if (evt.type === 'model.message.delta') {
+          if (evt.content) onEvent({ kind: 'text', text: evt.content });
+
+          for (const tc of evt.tool_calls ?? []) {
+            // Only the first fragment of a call carries its id; later ones are
+            // identified by index alone, so the mapping has to be remembered.
+            const id = tc.id ?? byIndex.get(tc.index);
+            if (!id) continue;
+            if (tc.id !== undefined) byIndex.set(tc.index, tc.id);
+
+            const prev = calls.get(id);
+            const name = tc.function?.name || prev?.name || 'tool';
+            const args = (prev?.args ?? '') + (tc.function?.arguments ?? '');
+            const system = (tc.tool_info?.type ?? prev?.system_type) === 'truefoundry-system';
+            calls.set(id, { name, args, system_type: tc.tool_info?.type ?? prev?.system_type });
+            onEvent({ kind: 'tool', id, name, detail: describeArgs(args), system, done: false });
+          }
+        }
+
+        if (evt.type === 'tool.response') {
+          const done = calls.get(evt.tool_call_id);
+          if (done) {
+            onEvent({
+              kind: 'tool',
+              id: evt.tool_call_id,
+              name: done.name,
+              detail: describeArgs(done.args),
+              system: done.system_type === 'truefoundry-system',
+              done: true,
+            });
+          }
+        }
       } catch {
         // A frame we cannot parse is not worth killing the conversation over.
       }

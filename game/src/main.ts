@@ -30,7 +30,12 @@ startEl.addEventListener('click', () => {
 });
 
 addEventListener('keydown', (e) => {
-  if (e.code === 'KeyE' && nearest && !dialogue.isOpen) dialogue.open(nearest.def);
+  if (e.code === 'KeyE' && nearest && !dialogue.isOpen) {
+    // open() focuses the input, and without this the same keystroke that
+    // started the conversation is then typed into it as a stray "e".
+    e.preventDefault();
+    dialogue.open(nearest.def);
+  }
 });
 
 addEventListener('resize', () => {

@@ -26,6 +26,10 @@ export function propTemplate(file: string, fit: 'height' | 'length' = 'height'):
       const root = gltf.scene;
       const box = new THREE.Box3().setFromObject(root);
       const size = box.getSize(new THREE.Vector3());
+      // Vehicles ('length' fit) must all agree on an axis: some Tripo models are
+      // authored along x (both waymos, the vespa) — turn them so length runs
+      // along z, matching the taxi, so a heading of rotation.y drives nose-first.
+      if (fit === 'length' && size.x > size.z) root.rotateY(Math.PI / 2);
       const s = 1 / Math.max(fit === 'height' ? size.y : Math.max(size.x, size.z), 0.001);
       root.scale.setScalar(s);
       const box2 = new THREE.Box3().setFromObject(root);
@@ -52,26 +56,26 @@ interface Placement {
   fit?: 'height' | 'length';
 }
 
-/** Hand-placed around Ashford: kawaii props hugging the paths, vehicles
- *  parked where their story wants them. Coordinates are island tiles. */
+/** Hand-placed around Ashford-by-the-Bay: kawaii props hugging the parks and
+ *  plazas, vehicles parked at the curb. Coordinates are island tiles. */
 const PLACEMENTS: Placement[] = [
-  // village set dressing
-  { file: 'mushroom-cottage.glb',    x: 11.5, z: 17.5, size: 2.7, rot: 0.9 },
-  { file: 'strawberry-mailbox.glb',  x: 12.6, z: 19.4, size: 1.25, rot: 0.5 },
-  { file: 'teapot-fountain.glb',     x: 16.5, z: 15.5, size: 1.5, rot: -0.4 },
-  { file: 'cloud-bench.glb',         x: 25.5, z: 21.3, size: 1.15, rot: Math.PI },
-  { file: 'cat-lamppost.glb',        x: 16.9, z: 30.6, size: 2.3, rot: 2.2 },
-  { file: 'boba-water-tower.glb',    x: 38.6, z: 18.5, size: 4.3, rot: -0.7 },
-  { file: 'sunflower-planter.glb',   x: 34.4, z: 27.0, size: 1.35, rot: 2.8 },
-  { file: 'frog-umbrella-stand.glb', x: 26.6, z: 33.6, size: 1.25, rot: -2.4 },
-  { file: 'dango-signpost.glb',      x: 22.7, z: 27.6, size: 1.9, rot: 0.35 },
-  { file: 'bread-cart.glb',          x: 31.4, z: 22.2, size: 1.9, rot: 0.25 },
-  { file: 'icecream-lamp.glb',       x: 25.8, z: 29.3, size: 2.5, rot: -0.5 },
-  { file: 'snail-wheelbarrow.glb',   x: 32.4, z: 12.6, size: 1.15, rot: 1.9 },
+  // city set dressing
+  { file: 'mushroom-cottage.glb',    x: 18.5, z: 51.0, size: 2.7, rot: 0.9 },   // Golden Gate Park
+  { file: 'teapot-fountain.glb',     x: 27.0, z: 53.6, size: 1.5, rot: -0.4 },  // Golden Gate Park
+  { file: 'strawberry-mailbox.glb',  x: 26.6, z: 75.6, size: 1.25, rot: 0.5 },  // farm gate
+  { file: 'cloud-bench.glb',         x: 50.6, z: 42.5, size: 1.15, rot: Math.PI }, // plaza
+  { file: 'dango-signpost.glb',      x: 50.4, z: 41.2, size: 1.9, rot: 0.35 },  // plaza north
+  { file: 'cat-lamppost.glb',        x: 34.4, z: 51.6, size: 2.3, rot: 2.2 },   // Alamo Square
+  { file: 'boba-water-tower.glb',    x: 25.5, z: 77.4, size: 4.3, rot: -0.7 },  // farm
+  { file: 'sunflower-planter.glb',   x: 44.3, z: 44.6, size: 1.35, rot: 2.8 },  // market
+  { file: 'frog-umbrella-stand.glb', x: 84.2, z: 42.8, size: 1.25, rot: -2.4 }, // Ferry Building
+  { file: 'bread-cart.glb',          x: 43.8, z: 42.9, size: 1.9, rot: 0.25 },  // market
+  { file: 'icecream-lamp.glb',       x: 51.6, z: 25.4, size: 2.5, rot: -0.5 },  // Gate overlook
+  { file: 'snail-wheelbarrow.glb',   x: 22.4, z: 78.2, size: 1.15, rot: 1.9 },  // farm
   // parked vehicles (the summonable fleet lives in taxi.ts)
-  { file: 'waymo-minivan.glb',  x: 15.8, z: 29.2, size: 2.9, rot: Math.PI / 2 + 0.15, fit: 'length' },
-  { file: 'bicycle.glb',        x: 24.9, z: 9.8,  size: 1.6, rot: 2.3, fit: 'length' },
-  { file: 'vespa-scooter.glb',  x: 32.2, z: 22.6, size: 1.5, rot: -1.1, fit: 'length' },
+  { file: 'waymo-minivan.glb',  x: 45.6, z: 50.5, size: 2.9, rot: 0.08, fit: 'length' },  // curb on the avenue
+  { file: 'bicycle.glb',        x: 61.3, z: 30.4, size: 1.6, rot: 2.3, fit: 'length' },   // Telegraph Hill path
+  { file: 'vespa-scooter.glb',  x: 44.6, z: 45.5, size: 1.5, rot: -1.1, fit: 'length' },  // market curb
 ];
 
 /** Fire-and-forget: props pop in as they load; a missing file just warns. */

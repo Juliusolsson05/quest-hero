@@ -7,7 +7,10 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview"
   },
-  "dependencies": { "three": "^0.181.0" },
+  "dependencies": {
+    "playroomkit": "^0.0.97",
+    "three": "^0.181.0"
+  },
   "devDependencies": {
     "@types/three": "^0.181.0",
     "typescript": "^5.9.3",

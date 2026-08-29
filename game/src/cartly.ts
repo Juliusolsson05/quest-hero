@@ -46,6 +46,8 @@ export class CartlyPhone {
   private selected: CartKind = 'taxi';
   private surge = 0;
   private fares: Record<CartKind, number> = { 'taxi': 8, 'waymo': 11, 'waymo-xl': 14 };
+  /** 'auto' (scenic default) or an NPC id — read by the cart at boarding time. */
+  destination = 'auto';
 
   onSummon: (kind: CartKind) => void = () => {};
   onCancel: () => void = () => {};
@@ -67,7 +69,9 @@ export class CartlyPhone {
             <div class="ph-route">
               <span class="ph-dotline"></span>
               <div><span class="ph-dot"></span><b class="ph-from">the plaza</b><i>thou art here</i></div>
-              <div><svg class="ph-pin" width="12" height="15" viewBox="0 0 14 17"><path d="M7 1 a6 6 0 0 1 6 6 c0 4 -6 9 -6 9 s-6 -5 -6 -9 a6 6 0 0 1 6 -6 Z" fill="#e2574f" stroke="#35313f" stroke-width="2"/></svg><b class="ph-to">across Ashford</b><i class="ph-dist"></i></div>
+              <div><svg class="ph-pin" width="12" height="15" viewBox="0 0 14 17"><path d="M7 1 a6 6 0 0 1 6 6 c0 4 -6 9 -6 9 s-6 -5 -6 -9 a6 6 0 0 1 6 -6 Z" fill="#e2574f" stroke="#35313f" stroke-width="2"/></svg>
+                <select class="ph-dest"><option value="auto">across the bay (scenic)</option></select>
+              </div>
             </div>
             <div class="ph-label">choose thy cart</div>
             <div class="ph-rides"></div>
@@ -130,10 +134,23 @@ export class CartlyPhone {
         ? 'Gideon says: „on my way, hold thy horses"'
         : 'the cart has no one to read thy raven';
     });
+    this.root.querySelector<HTMLSelectElement>('.ph-dest')!.addEventListener('change', (e) => {
+      this.destination = (e.target as HTMLSelectElement).value;
+    });
     addEventListener('keydown', (e) => {
       if (e.code === 'Escape' && this.open) this.close();
     });
     this.renderRides();
+  }
+
+  /** Fill the destination picker: the scenic default plus every citizen to meet. */
+  setDestinations(npcs: { id: string; label: string }[]): void {
+    const sel = this.root.querySelector<HTMLSelectElement>('.ph-dest')!;
+    const keep = this.destination;
+    sel.innerHTML = `<option value="auto">across the bay (scenic)</option>` +
+      npcs.map((n) => `<option value="${n.id}">meet ${esc(n.label)}</option>`).join('');
+    sel.value = [...sel.options].some((o) => o.value === keep) ? keep : 'auto';
+    this.destination = sel.value;
   }
 
   get open(): boolean { return this.root.classList.contains('on'); }
@@ -225,4 +242,10 @@ export class CartlyPhone {
     }
     this.root.querySelector('.ph-fare-chip')!.textContent = `${this.fares[this.selected]} gold`;
   }
+}
+
+function esc(s: string): string {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
 }

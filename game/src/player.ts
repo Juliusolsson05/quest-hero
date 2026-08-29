@@ -28,7 +28,7 @@ export class Player {
   private static readonly RUN = 6.4;
 
   constructor(dom: HTMLElement) {
-    this.camera = new THREE.PerspectiveCamera(58, innerWidth / innerHeight, 0.1, 260);
+    this.camera = new THREE.PerspectiveCamera(58, innerWidth / innerHeight, 0.1, 560);
     this.view = new CharacterView('hero', 0xa8e6cf, 1.5);
 
     addEventListener('keydown', (e) => {
@@ -48,7 +48,7 @@ export class Player {
       this.camPitch = THREE.MathUtils.clamp(this.camPitch + e.movementY * 0.004, 0.12, 1.25);
     });
     addEventListener('wheel', (e) => {
-      this.camDist = THREE.MathUtils.clamp(this.camDist + Math.sign(e.deltaY) * 0.8, 3.5, 13);
+      this.camDist = THREE.MathUtils.clamp(this.camDist + Math.sign(e.deltaY) * 0.8, 3.5, 18);
     }, { passive: true });
   }
 
@@ -79,12 +79,12 @@ export class Player {
       const dir = new THREE.Vector3(str, 0, -fwd)
         .normalize()
         .applyAxisAngle(new THREE.Vector3(0, 1, 0), this.camYaw);
-      // Axis-separated moves so we slide along blocked tiles instead of sticking.
-      const from = this.island.heightAt(this.pos.x, this.pos.z);
+      // Axis-separated moves so we slide along blocked tiles and walls instead
+      // of sticking; canMove also collides with building footprints.
       const nx = this.pos.x + dir.x * speed * dt;
-      if (this.island.walkable(nx, this.pos.z, from)) this.pos.x = nx;
+      if (this.island.canMove(this.pos.x, this.pos.z, nx, this.pos.z)) this.pos.x = nx;
       const nz = this.pos.z + dir.z * speed * dt;
-      if (this.island.walkable(this.pos.x, nz, this.island.heightAt(this.pos.x, this.pos.z))) this.pos.z = nz;
+      if (this.island.canMove(this.pos.x, this.pos.z, this.pos.x, nz)) this.pos.z = nz;
 
       this.groundY = this.island.heightAt(this.pos.x, this.pos.z);
       const target = Math.atan2(dir.x, dir.z);
@@ -114,8 +114,11 @@ export class Player {
       Math.cos(this.camYaw) * Math.cos(this.camPitch),
     ).multiplyScalar(this.camDist);
     const wanted = target.clone().add(off);
-    // Keep the camera above the terrain skin.
     if (this.island) {
+      // Pull in when a building would occlude the hero…
+      const t = this.island.cameraClearT(target, wanted);
+      if (t < 1) wanted.lerpVectors(target, wanted, Math.max(0.14, t));
+      // …and keep the camera above the terrain skin.
       const ch = this.island.heightAt(wanted.x, wanted.z);
       wanted.y = Math.max(wanted.y, ch + 0.6);
     }

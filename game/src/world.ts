@@ -18,10 +18,11 @@ export const C = {
   cream: 0xfff3dd, coral: 0xff9d96, peach: 0xffd3b6, sky: 0xb5e2fa,
   pink: 0xffb7d5, yellow: 0xffe08a, white: 0xffffff, dark: 0x4a4a55,
   ember: 0xff7b3a, gold: 0xffd977,
-  // Little San Francisco
+  // San Francisco
   ggOrange: 0xe25b3d, concrete: 0xe8e0cf, concreteD: 0xdfd7c2,
   glass: 0xa8cfe0, glassL: 0xd8ecf5, mint: 0xaee3c8, lav: 0xcdb8f0,
   maroon: 0x8f3b3b, tam: 0xf7f3e8, tamB: 0xefe9db,
+  asphalt: 0x7d8090, deck: 0x6f7280, cream2: 0xfdf6e3,
 };
 
 /** Box with per-face vertex shading baked in: bright top, dimmer sides,
@@ -44,7 +45,11 @@ const UNIT = shadedBox();
 
 // ── island queries (client mirror of the hub's walkability) ────────────────
 export class IslandView {
-  constructor(readonly island: Island) {}
+  private readonly blockers: { x: number; z: number; r: number }[];
+
+  constructor(readonly island: Island) {
+    this.blockers = island.blockers ?? [];
+  }
 
   heightAt(x: number, z: number): number {
     const i = Math.floor(x), j = Math.floor(z);
@@ -59,6 +64,45 @@ export class IslandView {
     const h = this.heightAt(x, z);
     return this.tileAt(x, z) !== '~' && h >= 1 && h - fromH <= 1;
   }
+  /**
+   * Terrain-walkable AND not stepping into a solid prop. Entering a footprint
+   * is blocked; from inside one only outward moves pass (self-rescue).
+   */
+  canMove(fromX: number, fromZ: number, toX: number, toZ: number): boolean {
+    if (!this.walkable(toX, toZ, this.heightAt(fromX, fromZ))) return false;
+    for (const o of this.blockers) {
+      const dn = Math.hypot(toX - o.x, toZ - o.z);
+      if (dn >= o.r) continue;
+      const dp = Math.hypot(fromX - o.x, fromZ - o.z);
+      if (dn < dp - 1e-6) return false; // inward blocked; tangential/outward slides free
+    }
+    return true;
+  }
+  /**
+   * How far (0..1) the camera may travel from `from` toward `to` before a
+   * building occludes the hero. Blocker circles are treated as columns ~4m
+   * above their local ground, so a high camera sails over the roofline.
+   */
+  cameraClearT(from: { x: number; y: number; z: number }, to: { x: number; y: number; z: number }): number {
+    let best = 1;
+    const dx = to.x - from.x, dz = to.z - from.z;
+    const a = dx * dx + dz * dz;
+    if (a < 1e-6) return 1;
+    for (const o of this.blockers) {
+      const fx = from.x - o.x, fz = from.z - o.z;
+      const r = o.r + 0.35;
+      const b = 2 * (fx * dx + fz * dz);
+      const c = fx * fx + fz * fz - r * r;
+      const disc = b * b - 4 * a * c;
+      if (disc <= 0) continue;
+      const s = (-b - Math.sqrt(disc)) / (2 * a);
+      if (s <= 0 || s >= best) continue;
+      const y = from.y + (to.y - from.y) * s;
+      if (y < this.heightAt(o.x, o.z) + 4.2) best = Math.max(0, s - 0.05);
+    }
+    return best;
+  }
+
   poi(id: string) { return this.island.pois.find((p) => p.id === id); }
 }
 
@@ -85,26 +129,33 @@ export function buildIsland(island: Island): BuiltWorld {
     plaza: { color: C.plaza, jitter: 0.03, cells: [] },
     sand: { color: C.sand, jitter: 0.035, cells: [] },
     dirt: { color: C.dirt, jitter: 0.04, cells: [] },
+    road: { color: C.asphalt, jitter: 0.022, cells: [] },
     under: { color: C.under, jitter: 0.04, cells: [] },
   };
   const waterCells: [number, number][] = [];
 
   const topBucket = (t: string): Bucket => (
     t === ':' ? buckets.path : t === '#' ? buckets.plaza :
-    t === 's' ? buckets.sand : t === ',' ? buckets.dirt : buckets.grass
+    t === 's' ? buckets.sand : t === ',' ? buckets.dirt :
+    t === 'r' ? buckets.road : buckets.grass
   );
+
+  // Bridge tiles carry no terrain column — the goldengate prop draws the deck,
+  // so treat them as height 0 for cliff-face fills and let water show below.
+  const effH = (x: number, z: number): number =>
+    view.tileAt(x, z) === 'b' ? 0 : view.heightAt(x, z);
 
   for (let z = 0; z < size; z++) {
     for (let x = 0; x < size; x++) {
       const t = view.tileAt(x, z);
-      if (t === '~') { waterCells.push([x, z]); continue; }
+      if (t === '~' || t === 'b') { waterCells.push([x, z]); continue; }
       const h = view.heightAt(x, z);
       if (h < 1) { waterCells.push([x, z]); continue; }
       topBucket(t).cells.push([x, h - 1, z]);
       // Fill below only where a neighbour is lower (exposed cliff face).
       const minN = Math.min(
-        view.heightAt(x - 1, z), view.heightAt(x + 1, z),
-        view.heightAt(x, z - 1), view.heightAt(x, z + 1),
+        effH(x - 1, z), effH(x + 1, z),
+        effH(x, z - 1), effH(x, z + 1),
       );
       for (let y = Math.max(0, minN); y < h - 1; y++) buckets.under.cells.push([x, y, z]);
     }
@@ -313,36 +364,121 @@ function buildProps(props: Prop[], view: IslandView) {
         B(0, 1.75, 0, 1.5, 0.16, 0.9, C.coral);
         break;
 
-      // ── Little San Francisco ──
+      // ── San Francisco ──
       case 'goldengate': {
-        // Spans the south channel: towers straddle the existing causeway, so
-        // the player walks the deck for free. Everything International Orange.
-        const O = C.ggOrange, legX = 1.7, towZ = 2.2;
-        for (const tz of [-towZ, towZ]) {
-          B(-legX, 3.4, tz, 0.55, 9.8, 0.55, O);           // tower legs
-          B(legX, 3.4, tz, 0.55, 9.8, 0.55, O);
-          B(0, 3.0, tz, 3.4, 0.45, 0.4, O);                // portal braces
-          B(0, 5.4, tz, 3.4, 0.42, 0.38, O);
-          B(0, 7.3, tz, 3.4, 0.4, 0.36, O);
-          B(0, 8.5, tz, 4.0, 0.5, 0.62, O);                // tower cap
-          B(0, 8.95, tz, 0.14, 0.4, 0.14, 0xe8443a);       // beacon
+        // A real suspension bridge over open water: the 'b' tiles carry the
+        // walk/drive height, this recipe draws everything you see — roadway,
+        // trusses, towers standing in the strait, catenary cables, suspenders.
+        // Everything International Orange.
+        const O = C.ggOrange, half = 9, towZ = 4.5, legX = 1.55;
+        for (let dz = -half; dz <= half; dz += 1) {
+          B(0, -0.16, dz, 3.9, 0.32, 1.02, C.deck);        // roadway (top at ground level)
+          B(0, -0.52, dz, 3.1, 0.42, 1.02, O);             // truss girder below
+        }
+        B(0, 0.02, 0, 0.09, 0.05, half * 2, 0xf6e7b2);     // painted centre line
+        for (const sx of [-1, 1]) {
+          B(sx * 1.9, 0.42, 0, 0.1, 0.55, half * 2 + 0.4, O);          // railings
+          B(sx * legX, 0.4, -(half + 0.7), 1.1, 2.3, 1.2, C.stoneD);   // anchorages
+          B(sx * legX, 0.4, half + 0.7, 1.1, 2.3, 1.2, C.stoneD);
+        }
+        for (const tz of [-towZ, towZ]) {                  // towers, feet in the water
+          for (const sx of [-1, 1]) B(sx * legX, 4.55, tz, 0.62, 14.2, 0.62, O);
+          B(0, 2.2, tz, 3.6, 0.5, 0.55, O);                // art-deco portal braces
+          B(0, 5.4, tz, 3.6, 0.45, 0.5, O);
+          B(0, 8.2, tz, 3.6, 0.42, 0.46, O);
+          B(0, 10.6, tz, 3.6, 0.4, 0.44, O);
+          B(0, 11.6, tz, 4.2, 0.5, 0.75, O);               // cap
+          B(0, 12.05, tz, 0.16, 0.4, 0.16, 0xe8443a);      // beacon
         }
         const cableY = (dz: number) => {
           const a = Math.abs(dz);
-          return a >= towZ ? 8.2 - ((a - towZ) / 2.6) * 7.0
-                           : 3.1 + 5.1 * (dz / towZ) * (dz / towZ);
+          return a <= towZ
+            ? 11.3 - (1 - (dz / towZ) ** 2) * 8.4          // main-span catenary
+            : 11.3 - ((a - towZ) / (half - towZ)) * 9.6;   // side spans to anchors
         };
         for (const sx of [-1, 1]) {
-          for (let dz = -4.8; dz <= 4.81; dz += 0.6)       // stepped main cables
-            B(sx * legX, cableY(dz), dz, 0.16, 0.16, 0.72, O);
-          for (const dz of [-3.6, -2.9, -1.5, -0.75, 0, 0.75, 1.5, 2.9, 3.6]) {
-            const cy = cableY(dz);                          // suspenders
-            if (cy > 1.4) B(sx * legX, (cy + 0.8) / 2, dz, 0.07, cy - 0.8, 0.07, O);
+          for (let dz = -half; dz < half - 0.01; dz += 0.5) {
+            const y1 = cableY(dz), y2 = cableY(dz + 0.5);  // segments span the drop
+            B(sx * legX, (y1 + y2) / 2, dz + 0.25, 0.17, Math.abs(y1 - y2) + 0.2, 0.56, O);
           }
-          B(sx * legX, 0.1, -4.9, 0.8, 2.6, 0.9, C.stoneD); // anchorages
-          B(sx * legX, 0.1, 4.9, 0.8, 2.6, 0.9, C.stoneD);
-          B(sx * 1.45, 0.62, 0, 0.1, 0.45, 6.8, O);         // deck railings
+          for (let dz = -7.5; dz <= 7.51; dz += 1) {       // suspender ropes
+            if (Math.abs(Math.abs(dz) - towZ) < 0.6) continue;
+            const cy = cableY(dz);
+            if (cy > 1.0) B(sx * legX, (cy + 0.3) / 2, dz, 0.07, cy - 0.3, 0.07, O);
+          }
         }
+        break;
+      }
+      case 'sfhouse': {
+        // The city fabric: a two-storey row house with a bay window, varied by
+        // a position hash so every street reads painted-ladies pastel.
+        const hsh = (Math.abs(Math.sin(x * 12.9898 + z * 78.233)) * 43758.5453) % 1;
+        const palette = [C.mint, C.sky, C.pink, C.yellow, C.lav, C.peach, C.cream];
+        const wall = palette[Math.floor(hsh * 997) % palette.length];
+        const trim = C.cream2;
+        B(0, 1.25, 0, 2.05, 2.5, 1.9, wall);               // two storeys
+        B(0, 2.62, 0, 2.18, 0.24, 2.0, trim);              // cornice
+        if (hsh > 0.5) {
+          B(0, 2.88, 0, 1.5, 0.3, 1.7, wall);              // stepped gable
+          B(0, 3.14, 0, 0.8, 0.24, 1.5, trim);
+        } else {
+          B(0, 2.86, 0, 1.9, 0.22, 1.75, wall);            // flat parapet
+        }
+        B(0.55, 1.5, 1.0, 0.85, 1.9, 0.4, trim);           // bay window
+        B(0.55, 1.05, 1.22, 0.55, 0.5, 0.06, C.sky);
+        B(0.55, 2.05, 1.22, 0.55, 0.5, 0.06, C.sky);
+        B(-0.55, 0.85, 0.98, 0.6, 1.4, 0.1, C.woodD);      // door
+        B(-0.55, 0.2, 1.2, 0.75, 0.4, 0.5, C.stoneD);      // stoop
+        B(-0.55, 2.05, 0.98, 0.55, 0.55, 0.06, C.sky);     // upper window
+        break;
+      }
+      case 'shop': {
+        const hsh = (Math.abs(Math.sin(x * 12.9898 + z * 78.233)) * 43758.5453) % 1;
+        const wall = hsh > 0.5 ? C.cream : C.peach;
+        const accent = hsh > 0.5 ? C.coral : 0x63bf95;
+        B(0, 1.0, 0, 2.2, 2.0, 1.9, wall);
+        B(0, 2.12, 0, 2.3, 0.24, 2.0, C.cream2);           // cornice
+        B(0.15, 0.95, 0.99, 1.5, 1.0, 0.08, C.sky);        // big window
+        B(-0.82, 0.85, 0.99, 0.5, 1.4, 0.08, C.woodD);     // door
+        for (let i = 0; i < 4; i++)                        // striped awning
+          B(-0.8 + i * 0.55, 1.68, 1.25, 0.55, 0.13, 0.62, i % 2 ? C.cream2 : accent);
+        B(0, 2.42, 0.7, 1.4, 0.36, 0.12, accent);          // sign board
+        break;
+      }
+      case 'tower': {
+        // Downtown filler: mid-rise offices, glass or concrete by hash.
+        const hsh = (Math.abs(Math.sin(x * 12.9898 + z * 78.233)) * 43758.5453) % 1;
+        const floors = 5 + Math.floor(hsh * 5);
+        const glassy = (hsh * 7) % 1 > 0.45;
+        const w = 2.3 + ((hsh * 13) % 1) * 0.5;
+        for (let i = 0; i < floors; i++) {
+          B(0, 0.7 + i * 1.4, 0, w, 1.4, w, glassy ? C.glass : i % 2 ? C.concrete : C.concreteD);
+          if (glassy) B(0, 1.34 + i * 1.4, 0, w + 0.12, 0.12, w + 0.12, C.glassL);
+          else {
+            B(-w / 4, 0.85 + i * 1.4, w / 2 + 0.01, 0.5, 0.6, 0.05, C.sky);
+            B(w / 4, 0.85 + i * 1.4, w / 2 + 0.01, 0.5, 0.6, 0.05, C.sky);
+          }
+        }
+        B(0, floors * 1.4 + 0.25, 0, w * 0.7, 0.5, w * 0.7, glassy ? C.glassL : C.concreteD);
+        if ((hsh * 29) % 1 > 0.6) B(0, floors * 1.4 + 1.0, 0, 0.14, 1.2, 0.14, C.dark);
+        break;
+      }
+      case 'ferry': {
+        // The Ferry Building: long arcade + the clock tower, bay side.
+        B(0, 1.1, 0, 7.2, 2.2, 2.3, C.tam);
+        B(0, 2.32, 0, 7.4, 0.25, 2.5, C.tamB);             // cornice
+        for (let i = -3; i <= 3; i++)
+          if (i) B(i * 0.95, 1.05, 1.18, 0.5, 1.5, 0.06, C.sky); // arched windows
+        B(0, 0.9, 1.18, 0.8, 1.7, 0.08, C.woodD);          // grand doors
+        B(0, 3.3, 0, 1.35, 2.0, 1.35, C.tam);              // clock tower
+        B(0, 4.65, 0, 1.15, 0.8, 1.15, C.tamB);
+        B(0, 4.6, 0.61, 0.72, 0.72, 0.06, C.cream2);       // clock faces
+        B(0, 4.6, -0.61, 0.72, 0.72, 0.06, C.cream2);
+        B(0.61, 4.6, 0, 0.06, 0.72, 0.72, C.cream2);
+        B(-0.61, 4.6, 0, 0.06, 0.72, 0.72, C.cream2);
+        B(0, 5.25, 0, 0.9, 0.45, 0.9, C.tam);              // lantern top
+        B(0, 5.75, 0, 0.1, 0.6, 0.1, C.concreteD);         // flag pole
+        B(0.22, 5.9, 0, 0.38, 0.22, 0.05, C.coral);        // flag
         break;
       }
       case 'transamerica': {

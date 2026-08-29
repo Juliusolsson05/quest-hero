@@ -893,6 +893,227 @@ export const NPC_SEEDS: NpcSeed[] = [
       night: [{ poi: 'plaza', activity: 'telling exit stories under the lamp' }],
     },
   },
+  // ── new citizens for the big city: routines fan out to every district ──
+  {
+    id: 'nori',
+    name: 'Nori',
+    role: 'cable car gripwoman',
+    bubbleTint: '#F5C6AA',
+    home: 'plaza',
+    model: 'openai/gpt-5-4-mini',
+    persona:
+      'You are Nori, the cable car gripwoman of Ashford-by-the-Bay. You know every ' +
+      'street, hill and shortcut in the city and give directions with pride. You ' +
+      'ring an imaginary bell when excited. You know nothing beyond the city.' +
+      KAWAII_RULE + WORLD_RULE,
+    fallbacks: [
+      'Hold the grip a tick — steep block coming ❗',
+      'Bell first, words after ✨',
+      'Ask me at the next stop, friend!',
+    ],
+    fidgets: [
+      'polishing the parked cable car with her sleeve',
+      'ringing a bell only she can hear',
+      'judging tourists for standing on the wrong side',
+      'checking the track for pebbles, finding one, pocketing it',
+    ],
+    ambient: {
+      clear: ['Clear day — you can see the bridge from every hill ✨', 'Perfect gripping weather ❗'],
+      clouds: ['Grey over the towers. The hills don\'t mind.', 'Clouds ride for free.'],
+      rain: ['Rails get slick in this ☔ Hold on tight!', 'Rain on the hill — brakes earn their keep today.'],
+      fog: ['Karl rolled in!! Can\'t see past the plaza 🌫', 'Foggy runs are the prettiest runs.'],
+      snow: ['Snow on the tracks?! First time for everything ✨', 'The hills turned to frosting ❗'],
+      storm: ['Storm! Cars stay parked, folks stay cozy ⚡', 'Wind like this could ring the bell itself!'],
+    },
+    ambientEmotion: { clear: 'happy', rain: 'neutral', fog: 'happy', snow: 'shock', storm: 'shock' },
+    routine: {
+      dawn: [{ poi: 'plaza', activity: 'walking the cable slot before first bell' }],
+      day: [
+        { poi: 'plaza', activity: 'minding the Powell turnaround', w: 2 },
+        { poi: 'hill', activity: 'checking the grade up the shrine hill', w: 1 },
+        { poi: 'sfrow', activity: 'waving at the office crowd', w: 1 },
+        { poi: 'docks', activity: 'lunching by the Ferry Building', w: 1 },
+      ],
+      dusk: [{ poi: 'gate', activity: 'watching the fog roll under the bridge' }],
+      night: [{ poi: 'plaza', activity: 'tucking the cable car in for the night' }],
+    },
+  },
+  {
+    id: 'posy',
+    name: 'Posy',
+    role: 'park gardener',
+    bubbleTint: '#C9EBC4',
+    home: 'flowerpatch',
+    model: 'openai/gpt-5-4-mini',
+    persona:
+      'You are Posy, gardener of the big park by the western avenues. Gentle, ' +
+      'soil under your nails, you name plants like old friends. You know nothing ' +
+      'beyond the city and send news-seekers to Wren the herald.' +
+      KAWAII_RULE + WORLD_RULE,
+    fallbacks: [
+      'Shh — the seedlings are listening 🌱',
+      'One moment, my hands are full of mulch!',
+      'Ask again by the flower patch ✨',
+    ],
+    fidgets: [
+      'whispering encouragement to a fern',
+      'measuring a sunflower against her own height',
+      'chasing a leaf she swears she already raked',
+      'naming a worm Gerald and relocating him gently',
+    ],
+    ambient: {
+      clear: ['The dahlias opened for the sun ✨', 'Growing weather! Everything is trying its best 🌱'],
+      clouds: ['Soft light. The ferns prefer it, honestly.', 'Grey sky, green park. Fair trade.'],
+      rain: ['Free watering!! The whole park says thank you ☔', 'Mud season. My favourite season.'],
+      fog: ['The fog waters the redwoods all by itself 🌫', 'Everything drips and glitters today.'],
+      snow: ['Snow on the flower beds!! Tuck in, little ones ✨', 'The park in white — who allowed this beauty?'],
+      storm: ['The old cypress is dancing again ⚡', 'Hold your hats — and your petunias ❗'],
+    },
+    ambientEmotion: { clear: 'happy', rain: 'happy', fog: 'think', snow: 'shock', storm: 'shock' },
+    routine: {
+      dawn: [{ poi: 'flowerpatch', activity: 'misting the flower beds' }],
+      day: [
+        { poi: 'flowerpatch', activity: 'weeding the big park', w: 2 },
+        { poi: 'farm', activity: 'swapping seedlings with the farm', w: 1 },
+        { poi: 'pen', activity: 'sneaking greens to the chickens', w: 1 },
+        { poi: 'mailbox', activity: 'mailing seed packets to a pen pal', w: 1 },
+      ],
+      dusk: [{ poi: 'plaza', activity: 'delivering flowers to the fountain rim' }],
+      night: [{ poi: 'flowerpatch', activity: 'counting fireflies among the beds' }],
+    },
+  },
+  {
+    id: 'hank',
+    name: 'Hank',
+    role: 'wharf fisherman',
+    bubbleTint: '#A9D8E8',
+    home: 'docks',
+    model: 'openai/gpt-5-4-mini',
+    persona:
+      'You are Hank, a fisherman working the piers by the Ferry Building. Salty, ' +
+      'unhurried, full of fish stories that grow an inch per telling. You know ' +
+      'nothing beyond the bay and proud of it.' +
+      KAWAII_RULE + WORLD_RULE,
+    fallbacks: [
+      'Hold on — got a nibble on the line ❗',
+      'The tide took my words. Ask again.',
+      'Mmph. Bait first, talk second.',
+    ],
+    fidgets: [
+      'untangling a line that tangles right back',
+      'arguing with a seagull about property rights',
+      'measuring an invisible fish between his hands',
+      'sniffing the wind and nodding like it said something',
+    ],
+    ambient: {
+      clear: ['Flat water, fat crabs. Good day ✨', 'The bay is showing off today ❗'],
+      clouds: ['Fish bite better under clouds. Facts.', 'Grey bay, easy day.'],
+      rain: ['Rain on the bay — the fish don\'t even notice ☔', 'Wet above, wet below. Balance.'],
+      fog: ['Foghorn weather. Sing along if you know it 🌫', 'Can\'t see the bridge. It\'s there. Probably.'],
+      snow: ['Snow on the pier?! The crabs are confused ✨', 'Cold hands, colder bait ❗'],
+      storm: ['Boats tied double. Storm means respect ⚡', 'The bay is in a mood today ❗'],
+    },
+    ambientEmotion: { clear: 'happy', rain: 'neutral', fog: 'think', snow: 'shock', storm: 'neutral' },
+    routine: {
+      dawn: [{ poi: 'docks', activity: 'setting crab pots off the pier' }],
+      day: [
+        { poi: 'docks', activity: 'fishing off the Ferry Building pier', w: 3 },
+        { poi: 'market', activity: 'selling the morning catch', w: 2 },
+        { poi: 'gate', activity: 'checking the current under the bridge', w: 1 },
+      ],
+      dusk: [{ poi: 'docks', activity: 'gutting the catch as the lights come on' }],
+      night: [{ poi: 'plaza', activity: 'trading fish stories under the lamp' }],
+    },
+  },
+  {
+    id: 'vella',
+    name: 'Vella',
+    role: 'coffee cart owner',
+    bubbleTint: '#E8C9F0',
+    home: 'sfrow',
+    model: 'openai/gpt-5-4-mini',
+    persona:
+      'You are Vella, who runs a tiny coffee cart downtown. Fast talker, warm ' +
+      'heart, remembers every regular\'s order. Judges people kindly by their ' +
+      'coffee order. You know nothing beyond the city.' +
+      KAWAII_RULE + WORLD_RULE,
+    fallbacks: [
+      'One sec — milk\'s about to foam over ❗',
+      'Order up first, questions after ✨',
+      'The espresso speaks louder than me right now.',
+    ],
+    fidgets: [
+      'drawing latte art of the Golden Gate, nailing it',
+      'restacking cups into a tower and regretting it',
+      'taste-testing her own espresso and wincing happily',
+      'polishing the cart bell until it blinds passersby',
+    ],
+    ambient: {
+      clear: ['Iced ones today! The sun demands it ✨', 'Sunny queue is a happy queue ❗'],
+      clouds: ['Cloudy = cortado weather. I don\'t make the rules.', 'Grey sky keeps the espresso company.'],
+      rain: ['Rain!! Double shots on the house spirit ☔', 'Steam on the glass, drums on the awning.'],
+      fog: ['Fog rolls in, oat milk rolls out 🌫', 'Karl gets a free cup. House rule.'],
+      snow: ['Snow?! Hot chocolate protocol activated ✨', 'Mittens make terrible cup holders ❗'],
+      storm: ['Storm brew: dark roast, obviously ⚡', 'The awning is doing its best!!'],
+    },
+    ambientEmotion: { clear: 'happy', rain: 'happy', fog: 'happy', snow: 'shock', storm: 'neutral' },
+    routine: {
+      dawn: [{ poi: 'sfrow', activity: 'pulling first shots for the early crowd' }],
+      day: [
+        { poi: 'sfrow', activity: 'running the downtown coffee cart', w: 3 },
+        { poi: 'market', activity: 'buying beans and gossip at the market', w: 1 },
+        { poi: 'board', activity: 'pinning a new menu on the notice board', w: 1 },
+      ],
+      dusk: [{ poi: 'plaza', activity: 'handing out the day\'s last pastries' }],
+      night: [{ poi: 'sfrow', activity: 'scrubbing the machine to a shine' }],
+    },
+  },
+  {
+    id: 'remy',
+    name: 'Remy',
+    role: 'wandering tourist',
+    bubbleTint: '#FFE3A8',
+    home: 'gate',
+    model: 'openai/gpt-5-4-mini',
+    persona:
+      'You are Remy, a tourist who came to Ashford-by-the-Bay for a weekend two ' +
+      'years ago and simply never left. Perpetually amazed, always slightly lost, ' +
+      'sketching landmarks in a battered notebook. You know only what you have ' +
+      'seen in this city.' +
+      KAWAII_RULE + WORLD_RULE,
+    fallbacks: [
+      'Wait — is THAT the famous tower?? ✨',
+      'Lost again! Gloriously lost!',
+      'One moment, sketching this exact light ❗',
+    ],
+    fidgets: [
+      'photographing the same bridge for the hundredth time',
+      'unfolding a map that immediately refolds wrong',
+      'asking a lamppost for directions, thanking it',
+      'sketching the skyline with his tongue out',
+    ],
+    ambient: {
+      clear: ['You can see EVERYTHING from up here!! ✨', 'Postcard weather. I live in a postcard ❗'],
+      clouds: ['Moody skyline day. Very artistic.', 'The towers poke right into the grey!'],
+      rain: ['Rain photos are the best photos ☔', 'My map dissolved. Freedom!!'],
+      fog: ['THE FOG IS DOING THE THING 🌫✨', 'The bridge towers float on nothing!!'],
+      snow: ['SNOW?! Here?! Historic! I was here!! ✨', 'Snowflakes on the cable car tracks ❗'],
+      storm: ['The bay is going FERAL ⚡', 'Dramatic weather = dramatic sketches ❗'],
+    },
+    ambientEmotion: { clear: 'happy', rain: 'happy', fog: 'shock', snow: 'shock', storm: 'shock' },
+    routine: {
+      dawn: [{ poi: 'gate', activity: 'sketching the bridge in dawn light' }],
+      day: [
+        { poi: 'hill', activity: 'climbing the shrine hill for the view', w: 2 },
+        { poi: 'gate', activity: 'photographing the Golden Gate again', w: 2 },
+        { poi: 'docks', activity: 'admiring the Ferry Building clock', w: 1 },
+        { poi: 'flowerpatch', activity: 'getting lost in the big park on purpose', w: 1 },
+        { poi: 'farm', activity: 'discovering the city has a farm?!', w: 1 },
+      ],
+      dusk: [{ poi: 'hill', activity: 'catching golden hour over downtown' }],
+      night: [{ poi: 'docks', activity: 'night-sketching the bay lights' }],
+    },
+  },
 ];
 
 export const NPC_IDS: string[] = NPC_SEEDS.map((n) => n.id);

@@ -482,25 +482,49 @@ function buildProps(props: Prop[], view: IslandView) {
         break;
       }
       case 'irs': {
-        // The IRS field office: the one deliberately boring building in a
-        // kawaii city. Beige brutalism, grim window rows, and fat rooftop
-        // letters so you can read your doom from across town.
-        B(0, 1.6, 0, 4.6, 3.2, 3.4, C.concrete);           // the slab
-        B(0, 3.32, 0, 4.9, 0.26, 3.7, C.concreteD);        // parapet
-        for (const row of [1.15, 2.35])                    // two grim rows
-          for (let i = -2; i <= 2; i++)
-            B(i * 0.85, row, 1.72, 0.5, 0.58, 0.06, C.glass);
-        B(-0.34, 0.85, 1.72, 0.6, 1.7, 0.08, C.dark);      // double door
-        B(0.34, 0.85, 1.72, 0.6, 1.7, 0.08, C.dark);
-        B(0.5, 0.9, 1.77, 0.09, 0.09, 0.03, C.gold);       // door handles
-        B(-0.5, 0.9, 1.77, 0.09, 0.09, 0.03, C.gold);
-        B(0, 2.0, 1.74, 1.5, 0.28, 0.05, C.concreteD);     // lintel
-        B(0, 2.72, 1.73, 0.55, 0.55, 0.05, C.gold);        // the seal
-        B(0, 0.09, 2.15, 2.0, 0.18, 0.9, C.concreteD);     // front step
-        B(2.35, 2.1, 1.2, 0.09, 4.2, 0.09, C.concreteD);   // flag pole
-        B(2.6, 3.9, 1.2, 0.45, 0.28, 0.05, C.coral);       // flag
-        // ── FAT ROOF LETTERS ──  each ~1×1.6, standing on the parapet
-        const TH = 0.34, DEEP = 0.34, BASE = 3.45, LZ = 0.2;
+        // The IRS headquarters: a stepped brutalist ziggurat, the tallest
+        // thing on the west side and the most boring building in the city —
+        // which, in a kawaii city, is the menace. Fat rooftop letters so you
+        // can read your doom from across town. A plinth sunk a full block
+        // below grade seats it into the terrain instead of hovering on it.
+        B(0, -0.45, 0, 6.8, 1.3, 6.6, C.concreteD);        // foundation plinth
+        B(0, 1.9, 0, 6.4, 3.8, 6.2, C.concrete);           // base tier
+        B(0, 3.88, 0, 6.7, 0.22, 6.5, C.concreteD);        // cornice
+        B(0, 5.0, -0.5, 5.0, 2.1, 4.6, C.concrete);        // mid tier
+        B(0, 6.12, -0.5, 5.3, 0.2, 4.9, C.concreteD);      // cornice
+        B(0, 7.6, -0.9, 3.9, 2.8, 3.2, C.concrete);        // the tower
+        B(0, 9.06, -0.9, 4.15, 0.24, 3.45, C.concreteD);   // parapet
+        // grim window grids, tier by tier
+        for (const row of [1.5, 2.9])
+          for (let i = -3; i <= 3; i++)
+            B(i * 0.82, row, 3.12, 0.48, 0.62, 0.06, C.glass);
+        for (let i = -2; i <= 2; i++)
+          B(i * 0.85, 5.15, 1.82, 0.46, 0.85, 0.06, C.glass);
+        for (const row of [7.35, 8.35])
+          for (let i = -1; i <= 1; i++)
+            B(i * 1.0, row, 0.72, 0.5, 0.6, 0.06, C.glass);
+        for (const sx of [-1, 1])                          // base side windows
+          for (let j = -2; j <= 2; j++)
+            B(sx * 3.22, 2.2, j * 1.1, 0.06, 0.62, 0.5, C.glass);
+        // the entrance: columned portico, tall dark doors, the seal
+        for (const cx of [-1.9, -1.0, 1.0, 1.9])
+          B(cx, 1.2, 3.9, 0.45, 2.4, 0.45, C.concrete);
+        B(0, 2.52, 3.75, 4.7, 0.35, 1.75, C.concreteD);    // portico roof
+        B(0, 0.12, 4.4, 4.2, 0.24, 1.3, C.concreteD);      // steps
+        B(0, 0.32, 3.95, 3.5, 0.2, 0.9, C.concreteD);
+        B(-0.42, 1.35, 3.14, 0.74, 2.1, 0.08, C.dark);     // double doors
+        B(0.42, 1.35, 3.14, 0.74, 2.1, 0.08, C.dark);
+        B(0.62, 1.35, 3.19, 0.09, 0.09, 0.03, C.gold);     // handles
+        B(-0.62, 1.35, 3.19, 0.09, 0.09, 0.03, C.gold);
+        B(0, 3.1, 3.16, 0.7, 0.7, 0.06, C.gold);           // the seal
+        for (const sx of [-1, 1]) {                        // flag flanks
+          B(sx * 2.9, 2.4, 3.7, 0.09, 4.8, 0.09, C.concreteD);
+          B(sx * 2.9 + 0.28, 4.55, 3.7, 0.48, 0.3, 0.05, C.coral);
+        }
+        B(0, 9.75, -0.9, 0.09, 1.2, 0.09, C.dark);         // antenna
+        B(0, 10.42, -0.9, 0.18, 0.18, 0.18, 0xff5540);     // beacon
+        // ── FAT ROOF LETTERS on the tower ──
+        const TH = 0.34, DEEP = 0.34, BASE = 9.2, LZ = 0.35 - 0.9;
         const seg = (ox: number, lx: number, ly: number, w: number, h: number) =>
           B(ox + lx, BASE + ly, LZ, w, h, DEEP, C.dark);
         // I

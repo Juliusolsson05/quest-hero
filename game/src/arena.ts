@@ -8,13 +8,13 @@ import { C } from './world';
  * and the presence; the fight comes later.
  */
 
-const HALF = 10;
+const HALF = 16;
 export const IRS_ARENA = {
   cx: 160,
   cz: -60,
   floorY: 1,
   /** Where the player materialises: just inside the south door. */
-  entrance: { x: 160, z: -60 + HALF - 2.2 },
+  entrance: { x: 160, z: -60 + HALF - 2.6 },
   bounds: { minX: 160 - HALF + 0.7, maxX: 160 + HALF - 0.7, minZ: -60 - HALF + 0.7, maxZ: -60 + HALF - 0.7, y: 1 },
 };
 
@@ -69,11 +69,11 @@ class Taxcollector {
 
   /** North half of the hall — he never crowds the exit. */
   private readonly route = [
-    { x: IRS_ARENA.cx - 5.5, z: IRS_ARENA.cz - 5 },
-    { x: IRS_ARENA.cx + 5.5, z: IRS_ARENA.cz - 5 },
-    { x: IRS_ARENA.cx + 5.5, z: IRS_ARENA.cz - 1 },
-    { x: IRS_ARENA.cx - 5.5, z: IRS_ARENA.cz - 1 },
-    { x: IRS_ARENA.cx, z: IRS_ARENA.cz - 6.5 },
+    { x: IRS_ARENA.cx - 10, z: IRS_ARENA.cz - 9 },
+    { x: IRS_ARENA.cx + 10, z: IRS_ARENA.cz - 9 },
+    { x: IRS_ARENA.cx + 10, z: IRS_ARENA.cz - 2 },
+    { x: IRS_ARENA.cx - 10, z: IRS_ARENA.cz - 2 },
+    { x: IRS_ARENA.cx, z: IRS_ARENA.cz - 11.5 },
   ];
 
   constructor() {
@@ -130,9 +130,11 @@ class Taxcollector {
     const paper = mk(this.armL, 0.02, 0.4, 0.3, 0xfdfaf2, -0.09, -1.21, 0.2, true);
     paper.rotation.x = -0.3;
 
-    // small head on a big frame — flat-top, shades
+    // small head on a big frame — flat-top, shades. The neck seats it into
+    // the trapezius shelf instead of hovering over it.
+    mk(this.root, 0.32, 0.3, 0.32, SKIN, 0, 2.5, 0);
     this.head = new THREE.Group();
-    this.head.position.y = 2.72;
+    this.head.position.y = 2.58;
     this.root.add(this.head);
     mk(this.head, 0.56, 0.5, 0.54, SKIN, 0, 0.25, 0);
     mk(this.head, 0.62, 0.16, 0.6, 0x2c2833, 0, 0.55, 0);     // flat-top
@@ -229,25 +231,28 @@ export class IrsArena {
     const FLOOR = 0x3b3e4a, WALL = 0x474b5c, TRIM = 0x2e3140;
 
     mk(W, 0.5, W, FLOOR, cx, floorY - 0.25, cz);                       // floor slab
-    mk(2.4, 0.03, 15, 0x8f3b3b, cx, floorY + 0.02, cz + 1);           // the red carpet to your audit
-    mk(W, 5.4, 0.6, WALL, cx, floorY + 2.7, cz - HALF - 0.3);         // north wall
-    mk(W, 5.4, 0.6, WALL, cx, floorY + 2.7, cz + HALF + 0.3);         // south wall
-    mk(0.6, 5.4, W, WALL, cx - HALF - 0.3, floorY + 2.7, cz);         // west wall
-    mk(0.6, 5.4, W, WALL, cx + HALF + 0.3, floorY + 2.7, cz);         // east wall
-    mk(W + 1.2, 0.5, W + 1.2, TRIM, cx, floorY + 5.6, cz);            // ceiling
+    mk(2.6, 0.03, 26, 0x8f3b3b, cx, floorY + 0.02, cz + 1.5);         // the red carpet to your audit
+    mk(W, 8, 0.6, WALL, cx, floorY + 4, cz - HALF - 0.3);             // north wall
+    mk(W, 8, 0.6, WALL, cx, floorY + 4, cz + HALF + 0.3);             // south wall
+    mk(0.6, 8, W, WALL, cx - HALF - 0.3, floorY + 4, cz);             // west wall
+    mk(0.6, 8, W, WALL, cx + HALF + 0.3, floorY + 4, cz);             // east wall
+    mk(W + 1.2, 0.5, W + 1.2, TRIM, cx, floorY + 8.25, cz);           // ceiling
 
-    for (const sx of [-1, 1]) for (const sz of [-1, 1])               // columns
-      mk(0.8, 5.4, 0.8, TRIM, cx + sx * (HALF - 1.6), floorY + 2.7, cz + sz * (HALF - 1.6));
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) {             // columns
+      mk(1.0, 8, 1.0, TRIM, cx + sx * (HALF - 2), floorY + 4, cz + sz * (HALF - 2));
+      mk(1.0, 8, 1.0, TRIM, cx + sx * (HALF - 2), floorY + 4, cz);
+    }
 
-    for (const lz of [-5.5, 0, 5.5])                                  // fluorescent gloom
-      mk(3.2, 0.14, 0.7, 0xf2f6e8, cx, floorY + 5.2, cz + lz, true);
+    for (const lz of [-10, -3.5, 3.5, 10])                            // fluorescent gloom
+      for (const lx of [-8, 0, 8])
+        mk(3.2, 0.14, 0.7, 0xf2f6e8, cx + lx, floorY + 7.9, cz + lz, true);
 
     // the seal wall behind him
-    const banner = textPlane('IRS', '#ffd977', '#28304a', 5.2, 2.6);
-    banner.position.set(cx, floorY + 3.1, cz - HALF + 0.02);
+    const banner = textPlane('IRS', '#ffd977', '#28304a', 8.5, 4.2);
+    banner.position.set(cx, floorY + 4.6, cz - HALF + 0.02);
     this.group.add(banner);
-    const motto = textPlane('EVERY COIN COUNTED', '#9aa4ad', '#2e3140', 6.4, 0.55);
-    motto.position.set(cx, floorY + 1.6, cz - HALF + 0.02);
+    const motto = textPlane('EVERY COIN COUNTED', '#9aa4ad', '#2e3140', 10, 0.85);
+    motto.position.set(cx, floorY + 2.0, cz - HALF + 0.02);
     this.group.add(motto);
 
     // the exit: a door you are free to use, in theory
@@ -259,13 +264,13 @@ export class IrsArena {
     this.group.add(exit);
 
     // a desk with unfiled paperwork, purely for menace
-    mk(2.6, 0.14, 1.1, 0x8f6a44, cx - 6.5, floorY + 0.95, cz - 7.4);
-    mk(0.24, 0.9, 0.9, 0x6f5236, cx - 7.5, floorY + 0.45, cz - 7.4);
-    mk(0.24, 0.9, 0.9, 0x6f5236, cx - 5.5, floorY + 0.45, cz - 7.4);
+    mk(2.6, 0.14, 1.1, 0x8f6a44, cx - 6.5, floorY + 0.95, cz - 13);
+    mk(0.24, 0.9, 0.9, 0x6f5236, cx - 7.5, floorY + 0.45, cz - 13);
+    mk(0.24, 0.9, 0.9, 0x6f5236, cx - 5.5, floorY + 0.45, cz - 13);
     for (let i = 0; i < 4; i++)
-      mk(0.5, 0.1 + (i % 2) * 0.1, 0.4, 0xfdfaf2, cx - 7.1 + i * 0.55, floorY + 1.1, cz - 7.35, true);
+      mk(0.5, 0.1 + (i % 2) * 0.1, 0.4, 0xfdfaf2, cx - 7.1 + i * 0.55, floorY + 1.1, cz - 12.95, true);
 
-    this.boss.root.position.set(cx, floorY, cz - 4);
+    this.boss.root.position.set(cx, floorY, cz - 7);
     this.group.add(this.boss.root);
   }
 

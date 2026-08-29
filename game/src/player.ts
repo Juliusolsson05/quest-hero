@@ -79,6 +79,11 @@ export class Player {
     this.arena = a;
   }
 
+  /** Point the camera (cutscene entrances: face the taxcollector, not a wall). */
+  setYaw(yaw: number): void {
+    this.camYaw = yaw;
+  }
+
   update(dt: number): void {
     const fwd = Number(this.keys.has('KeyW')) - Number(this.keys.has('KeyS'));
     const str = Number(this.keys.has('KeyD')) - Number(this.keys.has('KeyA'));
@@ -137,7 +142,11 @@ export class Player {
       const ch = this.island.heightAt(wanted.x, wanted.z);
       wanted.y = Math.max(wanted.y, ch + 0.6);
     } else if (this.arena) {
-      wanted.y = Math.max(wanted.y, this.arena.y + 0.5); // never under the floor
+      // The room is windowless on purpose; the camera never leaves it. Clamp
+      // the spring arm inside the walls and under the ceiling.
+      wanted.x = THREE.MathUtils.clamp(wanted.x, this.arena.minX, this.arena.maxX);
+      wanted.z = THREE.MathUtils.clamp(wanted.z, this.arena.minZ, this.arena.maxZ);
+      wanted.y = THREE.MathUtils.clamp(wanted.y, this.arena.y + 0.5, this.arena.y + 7.2);
     }
     this.camera.position.lerp(wanted, Math.min(1, dt * 10));
     this.camera.lookAt(target);

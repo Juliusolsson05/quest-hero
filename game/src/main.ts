@@ -208,7 +208,7 @@ carts.onRideEnd = (dest) => {
 const irsArena = new IrsArena();
 scene.add(irsArena.group);
 const irsDoor = (() => {
-  const p = generatedIsland.pois.find((q) => q.id === 'irs')?.pos ?? { x: 15.4, y: 2, z: 52 };
+  const p = generatedIsland.pois.find((q) => q.id === 'irs')?.pos ?? { x: 20.6, y: 2, z: 52 };
   return new THREE.Vector3(p.x, p.y, p.z);
 })();
 let irsKnocked = false;
@@ -229,6 +229,7 @@ const enterIrs = () => fadeThrough(() => {
   inArena = true;
   player.setArena(IRS_ARENA.bounds);
   player.teleport(new THREE.Vector3(IRS_ARENA.entrance.x, IRS_ARENA.floorY, IRS_ARENA.entrance.z));
+  player.setYaw(0); // walk in facing the taxcollector, not the door you came through
   ui.toast('the taxcollector looks up from his clipboard', '🧾');
 });
 const leaveIrs = () => fadeThrough(() => {
@@ -342,7 +343,3 @@ renderer.setAnimationLoop(() => {
 
   composer.render();
 });
-
-// TEMP debug hook — removed after verification
-(window as any).__player = player;
-(window as any).__irs = { enterIrs, leaveIrs, arena: irsArena };

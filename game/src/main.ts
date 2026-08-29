@@ -7,6 +7,8 @@ import type { Quest, ServerFrame } from '../../shared/protocol';
 import { island as generatedIsland } from '../../shared/island';
 import { Net } from './net';
 import { buildIsland, IslandView } from './world';
+import { buildDistance } from './distance';
+import { WaterFx } from './water-fx';
 import { Player } from './player';
 import { Entities } from './entities';
 import { Bubbles } from './bubbles';
@@ -20,9 +22,11 @@ import { CityFeed } from './feed';
 import { IrsArena, IRS_ARENA } from './arena';
 import { Minimap } from './minimap';
 import { Multiplayer } from './mp';
+import { TouchControls } from './touch';
 
+const COARSE = matchMedia('(pointer: coarse)').matches;
 const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setPixelRatio(Math.min(devicePixelRatio, COARSE ? 1.75 : 2)); // phone GPUs breathe easier
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -40,6 +44,7 @@ const ui = new Ui();
 const phone = new CartlyPhone();
 const feed = new CityFeed();
 const minimap = new Minimap();
+new TouchControls(player); // joystick + compact chrome on coarse-pointer devices
 
 // ── multiplayer (worldplay4's Playroom stack): the URL is the invite link ──
 const mp = new Multiplayer(scene);
@@ -63,6 +68,9 @@ mp.onRoster = (names) => {
 };
 void mp.join();
 
+const waterFx = new WaterFx();
+scene.add(waterFx.group);
+
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, player.camera));
 const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.28, 0.65, 0.88);
@@ -80,6 +88,11 @@ const island: IslandView = new IslandView(generatedIsland);
   scene.add(built.group);
   fx.attachWorld(built);
   initProps3d(scene, island); // Tripo kawaii props + the parked fleet
+  // The painted distance: rocks, headlands, a skyline — so the eye never
+  // finds the edge of the tile grid.
+  const far = buildDistance(new THREE.Vector3(generatedIsland.size / 2, 0, generatedIsland.size / 2));
+  scene.add(far.group);
+  fx.attachDistance(far.layers);
   minimap.bind(island);
 }
 const spawnPos = generatedIsland.pois.find((p) => p.id === 'plaza')?.pos ?? { x: 52, y: 2, z: 43 };
@@ -175,6 +188,11 @@ ui.onSay = (npcId, text) => {
 };
 ui.onAccept = (id) => net.send({ t: 'quest', id, action: 'accept' });
 
+// ── the sea ────────────────────────────────────────────────────────────────
+player.onEnterWater = (x, z) => waterFx.splash(x, z, 1);
+player.onLeaveWater = () => waterFx.splash(player.pos.x, player.pos.z, 0.5);
+player.onCurrent = () => ui.toast('the current out here is brutal — best turn back', '🌊');
+
 // ── Cartly: a real cart from the Tripo fleet rolls in over the Golden Gate ──
 const carts = new CartService(scene, player, () => island);
 if (import.meta.env.DEV) { // console-inspection only — never shipped
@@ -250,12 +268,8 @@ function nearestPoiLabel(): string {
   return best;
 }
 
-addEventListener('keydown', (e) => {
-  if (e.code === 'Escape' && ui.questsOpen) ui.closeQuests();
-  if (document.body.dataset.typing === '1') return;
-  if (e.code === 'KeyP') { phone.setFrom(nearestPoiLabel()); phone.toggle(); return; }
-  if (e.code === 'KeyL') { feed.toggle(); return; }
-  if (e.code !== 'KeyE') return;
+/** The E action — also fired by tapping the interaction pill on touch. */
+function interact(): void {
   if (inArena) {
     if (irsArena.nearExit(player.pos)) leaveIrs();
     return;
@@ -271,6 +285,15 @@ addEventListener('keydown', (e) => {
   const npc = entities.nearestNpc(player.pos, 3.4);
   if (npc) { ui.openTalk(npc.id, `${npc.name} · ${npc.role}`); return; }
   if (boardPos && boardPos.distanceTo(player.pos) < 3.2) ui.openQuests();
+}
+ui.onPromptTap = interact;
+
+addEventListener('keydown', (e) => {
+  if (e.code === 'Escape' && ui.questsOpen) ui.closeQuests();
+  if (document.body.dataset.typing === '1') return;
+  if (e.code === 'KeyP') { phone.setFrom(nearestPoiLabel()); phone.toggle(); return; }
+  if (e.code === 'KeyL') { feed.toggle(); return; }
+  if (e.code === 'KeyE') interact();
 });
 
 // Pose uplink at 10Hz.
@@ -279,7 +302,12 @@ setInterval(() => {
 }, 100);
 
 const startEl = document.getElementById('start')!;
-startEl.addEventListener('click', () => startEl.classList.add('hidden'));
+startEl.addEventListener('pointerdown', () => startEl.classList.add('hidden')); // tap or click
+if (COARSE) {
+  startEl.querySelector('.keys')!.textContent =
+    'left stick to stroll (push far to run) · drag to look · pinch to zoom · tap the pill to talk';
+  startEl.querySelector('.go')!.textContent = 'tap to step off the cable car ✨';
+}
 
 addEventListener('resize', () => {
   player.camera.aspect = innerWidth / innerHeight;
@@ -307,6 +335,8 @@ renderer.setAnimationLoop(() => {
   entities.update(dt);
   mp.update(dt);
   mp.setPose({ x: player.pos.x, y: player.pos.y, z: player.pos.z, rot: player.rot, anim: player.anim, t: Date.now() });
+  if (player.swimming) waterFx.trail(player.pos.x, player.pos.z, player.anim !== 'idle', dt);
+  waterFx.update(dt);
   fx.update(dt, player.camera);
 
   if (island) {

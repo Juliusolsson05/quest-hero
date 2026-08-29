@@ -97,7 +97,7 @@ function templateQuest(headline: string, url: string): Quest {
 async function scribeTurn(sid: string, content: string, url: string): Promise<Quest | null> {
   let acc = '';
   const ctrl = new AbortController();
-  let wd = setTimeout(() => ctrl.abort(), 12_000);
+  let wd = setTimeout(() => ctrl.abort(), 20_000);
   try {
     await streamTurn(
       sid,
@@ -105,8 +105,10 @@ async function scribeTurn(sid: string, content: string, url: string): Promise<Qu
       {
         onDelta: (c) => {
           acc += c;
+        },
+        onActivity: () => {
           clearTimeout(wd);
-          wd = setTimeout(() => ctrl.abort(), 12_000);
+          wd = setTimeout(() => ctrl.abort(), 20_000);
         },
       },
       ctrl.signal,

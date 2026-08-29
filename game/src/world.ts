@@ -23,7 +23,14 @@ export const C = {
   glass: 0xa8cfe0, glassL: 0xd8ecf5, mint: 0xaee3c8, lav: 0xcdb8f0,
   maroon: 0x8f3b3b, tam: 0xf7f3e8, tamB: 0xefe9db,
   asphalt: 0x7d8090, deck: 0x6f7280, cream2: 0xfdf6e3,
+  // The open sea beyond the grid: the composite of a translucent water tile
+  // over its dark bed, so the two meet without a seam.
+  seaFar: 0x70bfd6,
 };
+
+/** Top of the water. Tiles sit 0..0.84; land starts at 1, so a beach stands a
+ *  fifth of a block proud of the sea. Everything that floats reads from here. */
+export const SEA_Y = 0.84;
 
 /** Box with per-face vertex shading baked in: bright top, dimmer sides,
  *  darkest bottom. Multiplied with material/instance colour, it gives the
@@ -65,18 +72,24 @@ export class IslandView {
     return this.tileAt(x, z) !== '~' && h >= 1 && h - fromH <= 1;
   }
   /**
-   * Terrain-walkable AND not stepping into a solid prop. Entering a footprint
-   * is blocked; from inside one only outward moves pass (self-rescue).
+   * Does this step push into a solid prop? Entering a footprint is blocked;
+   * from inside one only outward moves pass (self-rescue), so nobody can be
+   * wedged permanently inside a wall.
    */
-  canMove(fromX: number, fromZ: number, toX: number, toZ: number): boolean {
-    if (!this.walkable(toX, toZ, this.heightAt(fromX, fromZ))) return false;
+  blocked(fromX: number, fromZ: number, toX: number, toZ: number): boolean {
     for (const o of this.blockers) {
       const dn = Math.hypot(toX - o.x, toZ - o.z);
       if (dn >= o.r) continue;
       const dp = Math.hypot(fromX - o.x, fromZ - o.z);
-      if (dn < dp - 1e-6) return false; // inward blocked; tangential/outward slides free
+      if (dn < dp - 1e-6) return true; // inward blocked; tangential/outward slides free
     }
-    return true;
+    return false;
+  }
+
+  /** Terrain-walkable AND not stepping into a solid prop. */
+  canMove(fromX: number, fromZ: number, toX: number, toZ: number): boolean {
+    return this.walkable(toX, toZ, this.heightAt(fromX, fromZ))
+      && !this.blocked(fromX, fromZ, toX, toZ);
   }
   /**
    * How far (0..1) the camera may travel from `from` toward `to` before a
@@ -114,6 +127,30 @@ export interface BuiltWorld {
   smoke: THREE.Vector3[];
   fountains: THREE.Vector3[];
   water: THREE.InstancedMesh | null;
+  sea: THREE.Group;
+}
+
+/**
+ * The sea past the tile grid: four quads framing the island out to well beyond
+ * the fog, so distance swallows the water rather than an edge cutting it off.
+ * A frame rather than one big plane, so nothing overlaps the island's own
+ * translucent tiles and their dark bed.
+ */
+function buildOpenSea(size: number): THREE.Group {
+  const g = new THREE.Group();
+  const R = 700;
+  const mat = new THREE.MeshStandardMaterial({ color: C.seaFar, roughness: 0.4 });
+  const quad = (x0: number, z0: number, x1: number, z1: number) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(x1 - x0, z1 - z0), mat);
+    m.rotation.x = -Math.PI / 2;
+    m.position.set((x0 + x1) / 2, SEA_Y, (z0 + z1) / 2);
+    g.add(m);
+  };
+  quad(-R, -R, size + R, 0);           // north of the grid
+  quad(-R, size, size + R, size + R);  // south
+  quad(-R, 0, 0, size);                // west
+  quad(size, 0, size + R, size);       // east
+  return g;
 }
 
 export function buildIsland(island: Island): BuiltWorld {
@@ -210,8 +247,11 @@ export function buildIsland(island: Island): BuiltWorld {
   group.add(built.mesh);
   for (const m of built.extras) group.add(m);
 
+  const sea = buildOpenSea(size);
+  group.add(sea);
+
   return { group, lamps: built.lamps, glows: built.glows, smoke: built.smoke,
-           fountains: built.fountains, water };
+           fountains: built.fountains, water, sea };
 }
 
 // ── prop construction: little box recipes, merged per colour ───────────────

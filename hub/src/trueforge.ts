@@ -142,6 +142,9 @@ export interface TurnCallbacks {
   onDelta: (chunk: string) => void;
   /** one badge per real tool call: name or "tool: query…" once args parse */
   onTool?: (label: string) => void;
+  /** fires on every chunk off the wire — reasoning deltas, system tool calls,
+   *  keep-alives — so a stall watchdog measures a dead stream, not a quiet one */
+  onActivity?: () => void;
 }
 
 function toolDetail(c: ToolCallAcc): string | null {
@@ -225,6 +228,7 @@ export async function streamTurn(sessionId: string, content: string, cb: TurnCal
   const decoder = new TextDecoder();
   let buffer = '';
   for await (const chunk of res.body) {
+    cb.onActivity?.();
     buffer += decoder.decode(chunk as Uint8Array, { stream: true });
     const frames = buffer.split('\n\n');
     buffer = frames.pop() ?? '';

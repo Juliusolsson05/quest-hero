@@ -187,6 +187,7 @@ export class CartService {
     const streets = this.streets()!;
     this.phase = 'riding';
     this.player.view.root.visible = false;
+    this.player.controlled = false;     // the cart owns the hero's pose now
     document.body.dataset.typing = '1'; // freeze WASD while riding
     const here: [number, number] = [Math.floor(this.mesh.position.x), Math.floor(this.mesh.position.z)];
     // Destination: a chosen rendezvous (an NPC picked on the phone) wins;
@@ -276,6 +277,7 @@ export class CartService {
     const island = this.island();
     const m = this.mesh!;
     this.player.view.root.visible = true;
+    this.player.controlled = true;
     delete document.body.dataset.typing;
     // Step out beside the cart — prefer the sidewalk over the roadway.
     let out: THREE.Vector3 | null = null;

@@ -24,7 +24,13 @@ import {
 import { HarnessUnavailable, sessionFor, streamTurn } from './trueforge';
 import { dist2d, nextId, pick, warnOnce } from './util';
 
-const STALL_MS = 10_000;
+/** No bytes at all from the harness for this long → the stream is dead. Wide
+ *  because a server-side tool run (tavily search, scrape) is silent on the
+ *  wire until its tool.response lands. */
+const STALL_MS = 45_000;
+/** Hard ceiling per player turn, activity or not — an agent that is still
+ *  happily searching two minutes in has lost the player anyway. */
+const TURN_CAP_MS = 120_000;
 
 // ── emotion parsing ─────────────────────────────────────────────────────────
 
@@ -131,6 +137,7 @@ async function runTurn(npc: Npc, seed: NpcSeed, convId: string, text: string, fr
   let lastEmit = 0;
   const ctrl = new AbortController();
   let watchdog = setTimeout(() => ctrl.abort(), STALL_MS);
+  const cap = setTimeout(() => ctrl.abort(), TURN_CAP_MS);
   const bump = () => {
     clearTimeout(watchdog);
     watchdog = setTimeout(() => ctrl.abort(), STALL_MS);
@@ -142,9 +149,9 @@ async function runTurn(npc: Npc, seed: NpcSeed, convId: string, text: string, fr
       sid,
       digest,
       {
+        onActivity: bump,
         onDelta: (chunk) => {
           acc += chunk;
-          bump();
           if (/^\s*\[[a-z]*$/i.test(acc)) return; // partial leading emotion tag — hold
           const p = parseEmotion(acc);
           const now = Date.now();
@@ -154,22 +161,29 @@ async function runTurn(npc: Npc, seed: NpcSeed, convId: string, text: string, fr
           }
         },
         onTool: (label) => {
-          bump();
           broadcast({ t: 'bubble', who: npc.id, convId, text: label, emotion: 'think', mode: 'tool' });
         },
       },
       ctrl.signal,
     );
-    clearTimeout(watchdog);
     const p = parseEmotion(acc);
     const final = p.text.trim();
     if (!final) throw new HarnessUnavailable('empty reply');
     finishTurn(npc, convId, final, p.emotion);
   } catch (e) {
-    clearTimeout(watchdog);
+    // A stream that dies mid-answer still said something — a truncated real
+    // reply beats a canned line that ignores the question.
+    const p = parseEmotion(acc);
+    if (p.text.trim()) {
+      finishTurn(npc, convId, p.text.trim(), p.emotion);
+      return;
+    }
     const why = e instanceof Error ? e.message : String(e);
     warnOnce('trueforge-down', `[dialogue] TrueForge fallback path (${why}) — canned lines until it recovers`);
     finishTurn(npc, convId, pick(seed.fallbacks), 'think');
+  } finally {
+    clearTimeout(watchdog);
+    clearTimeout(cap);
   }
 }
 

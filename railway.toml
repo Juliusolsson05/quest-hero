@@ -1,0 +1,10 @@
+# Railway build/deploy config for the "world" service (hub + TrueForge).
+# The build context is the repo root because hub imports ../shared.
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "deploy/world/Dockerfile"
+
+[deploy]
+healthcheckPath = "/api/health"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"

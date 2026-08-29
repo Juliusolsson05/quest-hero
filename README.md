@@ -148,6 +148,22 @@ Both MCP servers need registering in TrueForge once — see the `curl` in each s
 The game is fully playable with zero keys configured: NPCs fall back to canned lines until
 TrueForge has a model, and characters use kawaii voxel placeholders until Tripo GLBs land.
 
+## Share it (sf-quest.vercel.app)
+
+The hosted client generates the city itself, so the link works with nothing running — but the
+citizens live in your hub, and a hosted page cannot reach `ws://localhost` (that address is the
+visitor's own machine). Expose the hub, then build against it:
+
+```bash
+npm --prefix game run tunnel          # cloudflared → prints https://<name>.trycloudflare.com
+VITE_HUB_WS="wss://<name>.trycloudflare.com/ws" npm --prefix game run deploy
+```
+
+Quick tunnels mint a new hostname each start, so re-run both lines after restarting one. No
+rebuild needed to retarget a client: `?hub=wss://…` overrides the baked-in default and is
+remembered (`?hub=` alone forgets it). Without a reachable hub the city still walks, drives and
+plays multiplayer — the chip reads "solo city — citizens asleep" and the NPCs simply aren't there.
+
 ## Status
 
 Specs frozen (docs/SPEC.md). World Hub + voxel third-person client implemented and integrated:

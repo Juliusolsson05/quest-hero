@@ -11,6 +11,9 @@ import { C } from '../world';
  * the hooks at the bottom of the Taxcollector class.
  */
 
+/** Mark's whole personality, for when the MCP server gives him a voice. */
+export const MARK_LINE = 'You are NEVER going to make it as a founder';
+
 const HALF = 16;
 export const IRS_ARENA = {
   cx: 160,
@@ -49,7 +52,12 @@ function textPlane(text: string, fg: string, bg: string, w: number, h: number): 
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.fillStyle = fg;
-  ctx.font = `900 ${Math.round(canvas.height * 0.62)}px system-ui, sans-serif`;
+  let px = Math.round(canvas.height * 0.62);
+  ctx.font = `900 ${px}px system-ui, sans-serif`;
+  while (px > 8 && ctx.measureText(text).width > canvas.width * 0.94) {
+    px -= 2;
+    ctx.font = `900 ${px}px system-ui, sans-serif`;
+  }
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText(text, canvas.width / 2, canvas.height / 2 + canvas.height * 0.04);
   const tex = new THREE.CanvasTexture(canvas);
@@ -132,7 +140,7 @@ export class Taxcollector {
     mk(this.torso, 0.18, 0.8, 0.05, TIE, 0, 0.5, 0.46);       // the tie
     mk(this.torso, 0.26, 0.14, 0.05, TIE, 0, 0.98, 0.46);     // knot
     mk(this.torso, 0.3, 0.1, 0.04, C.gold, -0.55, 0.9, 0.45); // badge
-    const chest = textPlane('IRS', '#28304a', '#f6f3ea', 0.62, 0.3);
+    const chest = textPlane('ENEMY', '#28304a', '#f6f3ea', 0.62, 0.3);
     chest.position.set(0.42, 0.72, 0.44);
     this.torso.add(chest);
 
@@ -174,7 +182,7 @@ export class Taxcollector {
     mk(this.bazooka, 0.46, 0.46, 0.22, 0x39452f, 0, 0, -0.85);// venturi
     mk(this.bazooka, 0.08, 0.08, 0.5, C.gold, 0, 0.26, 0.3);  // brass rail
     mk(this.bazooka, 0.12, 0.22, 0.12, 0x2c2f3a, 0.1, -0.3, 0.28); // grip
-    const stencil = textPlane('IRS', '#ffd977', '#4c5a3f', 0.5, 0.24);
+    const stencil = textPlane('DENIED', '#ffd977', '#4c5a3f', 0.5, 0.24);
     stencil.position.set(0.21, 0, -0.2);
     stencil.rotation.y = Math.PI / 2;
     this.bazooka.add(stencil);
@@ -416,10 +424,10 @@ export class IrsArena {
         mk(3.2, 0.14, 0.7, 0xf2f6e8, cx + lx, floorY + 7.9, cz + lz, true);
 
     // the seal wall behind him
-    const banner = textPlane('IRS', '#ffd977', '#28304a', 8.5, 4.2);
+    const banner = textPlane('ENEMY', '#ffd977', '#28304a', 8.5, 4.2);
     banner.position.set(cx, floorY + 4.6, cz - HALF + 0.02);
     this.group.add(banner);
-    const motto = textPlane('EVERY COIN COUNTED', '#9aa4ad', '#2e3140', 10, 0.85);
+    const motto = textPlane(MARK_LINE.toUpperCase(), '#9aa4ad', '#2e3140', 12, 0.85);
     motto.position.set(cx, floorY + 2.0, cz - HALF + 0.02);
     this.group.add(motto);
 

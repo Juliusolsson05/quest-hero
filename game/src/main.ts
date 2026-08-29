@@ -123,6 +123,7 @@ const cartly = new Cartly(scene, player, () => island, {
 });
 
 const irs = new IrsEncounter(scene, generatedIsland, player, toast);
+irs.onSeclusion = (secluded) => { mp.avatarsVisible = !secluded; };
 
 const hub = new HubLink({ player, entities, ui, fx, bubbles, feed, cartly });
 void hub; // lives for the whole run; every hub effect arrives through its wiring
@@ -224,7 +225,7 @@ renderer.setAnimationLoop(() => {
   irs.update(dt);
 
   mmAcc += dt;
-  if (mmAcc > 0.1) { // 10Hz redraw — a full-canvas repaint per frame is waste
+  if (!COARSE && mmAcc > 0.1) { // 10Hz redraw — a full-canvas repaint per frame is waste
     mmAcc = 0;
     minimap.update(
       { x: player.pos.x, z: player.pos.z, rot: player.rot },

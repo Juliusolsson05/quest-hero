@@ -93,8 +93,10 @@ export class Dialogue {
       reply.remove();
       // A missing harness is the normal state before a model is configured,
       // so it explains itself rather than failing silently.
+      // HarnessUnavailable carries a specific cause (harness down, no model
+      // configured, bad response); showing it beats a generic guess.
       this.line('err', err instanceof HarnessUnavailable
-        ? `[${npc.name} is silent — TrueForge unreachable at localhost:8790, or no model configured yet]`
+        ? `[${npc.name} is silent — ${err.message}]`
         : `[error: ${String(err)}]`);
     } finally {
       this.busy = false;

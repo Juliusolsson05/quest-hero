@@ -10,6 +10,18 @@ export interface NpcDef {
    *  mesh so a character is one object in the codebase, not a model in one
    *  file and a prompt in another that quietly disagree. */
   persona: string;
+  /**
+   * Model FQN. Chosen per character rather than globally: dialogue is
+   * latency-sensitive in a way a research agent is not, so a character who
+   * only reads local state gets the fast model, while one who runs multi-step
+   * web lookups gets the stronger one. Falls back to whatever is configured
+   * if this id is not available.
+   */
+  model: string;
+  /** Names of MCP servers from Settings -> Connectors, per character. Bran has
+   *  no business searching the web, and withholding the tool is more reliable
+   *  than instructing him not to use it. */
+  mcpServers?: string[];
 }
 
 export const NPCS: NpcDef[] = [
@@ -19,13 +31,18 @@ export const NPCS: NpcDef[] = [
     role: 'blacksmith',
     position: [1.8, -3],
     color: 0xd08b4a,
+    model: 'openai/gpt-5-4-mini',
     persona:
       'You are Bran, a blacksmith in the town of Ashford. Blunt, warm underneath, ' +
       'economical with words — two or three sentences unless asked for detail. ' +
       'You can inspect the player\'s inventory and quest state with your tools, and ' +
       'you should, rather than guessing at what they carry. You never invent items ' +
       'that are not in their inventory. Before you take something from a player or ' +
-      'change the world, you ask them plainly and wait for an answer.',
+      'change the world, you ask them plainly and wait for an answer. ' +
+      'You know nothing of the world beyond Ashford and you have no way to find ' +
+      'out — you are a smith, not a herald. If asked about news, weather, or ' +
+      'anything outside this town, say so plainly and send them to Wren, the ' +
+      'herald, who trades in word from the far roads. Never guess at such things.',
   },
   {
     id: 'herald',
@@ -33,6 +50,8 @@ export const NPCS: NpcDef[] = [
     role: 'town herald',
     position: [-4, 4],
     color: 0x6aa9d0,
+    model: 'openai/gpt-5-5',
+    mcpServers: ['tavily'],
     persona:
       'You are Wren, herald of Ashford, who trades in news. You are curious about ' +
       'the world beyond the town and you have tools that reach it. When a traveller ' +

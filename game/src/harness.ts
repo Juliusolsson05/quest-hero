@@ -13,22 +13,56 @@ import type { NpcDef } from './npc';
  * would give us a goldfish that reintroduces itself every time you walk up.
  */
 
-const BASE = import.meta.env.VITE_TRUEFORGE_URL ?? 'http://localhost:8790';
+// Same-origin by default: vite.config.ts proxies /api/v1 to the harness,
+// because TrueForge sends no CORS headers and a direct cross-origin
+// fetch from the browser fails opaquely.
+const BASE = import.meta.env.VITE_TRUEFORGE_URL ?? '';
+
+/** Raised for every reason an NPC cannot answer, carrying the specific cause
+ *  so the dialogue box can show it rather than a generic failure. */
+export class HarnessUnavailable extends Error {}
 
 const sessions = new Map<string, string>();
 
-export class HarnessUnavailable extends Error {}
+/** Cached so we resolve the model once per page load, not once per NPC. */
+let modelPromise: Promise<string[]> | null = null;
+
+/** Lists the model FQNs the harness actually has configured. Characters name
+ *  a preferred model, but the machine decides what exists, so selection is a
+ *  negotiation between the two rather than a hardcoded id. */
+async function configuredModels(): Promise<string[]> {
+  const res = await fetch(`${BASE}/api/v1/models`);
+  if (!res.ok) throw new HarnessUnavailable(`models: ${res.status}`);
+  const models: { name?: string }[] = (await res.json())?.data ?? [];
+  return models.map((m) => m.name).filter((n): n is string => !!n);
+}
 
 async function sessionFor(npc: NpcDef): Promise<string> {
   const existing = sessions.get(npc.id);
   if (existing) return existing;
 
+  modelPromise ??= configuredModels();
+  const available = await modelPromise;
+  const model = available.includes(npc.model) ? npc.model : available[0];
+  if (!model) {
+    throw new HarnessUnavailable(
+      'no model configured in TrueForge — add a provider at http://localhost:8790 (Settings -> Models)',
+    );
+  }
+
   const res = await fetch(`${BASE}/api/v1/sessions`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
-      agent: { spec: { instructions: npc.persona } },
-      metadata: { npc: npc.id, name: npc.name },
+      agent: {
+        spec: {
+          model: { name: model },
+          instructions: npc.persona,
+          ...(npc.mcpServers?.length
+            ? { mcp_servers: npc.mcpServers.map((name) => ({ name })) }
+            : {}),
+        },
+      },
     }),
   });
   if (!res.ok) throw new HarnessUnavailable(`create session: ${res.status} ${await res.text()}`);

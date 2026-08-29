@@ -92,6 +92,12 @@ Configuration lives in YAML catalogs (models, MCP servers, sandbox) and git-back
 
 **`quest-hero-web`** — live web data via [Bright Data](https://brightdata.com), so a character can speak to what is true today. Scraper configuration is committed to the repo and reused by the agent automatically, and the pipeline is expected to notice when a target site changes and repair itself rather than silently going stale.
 
+Two more shipped, each attached to exactly one character — withholding a tool is far more reliable than instructing a model not to use it:
+
+**[`sf-guide`](mcp/sf-guide/)** (:8811) — 33 live San Francisco data sources behind 8 tools, for Dylan, a tourist guide who has not noticed he is in a medieval village. No API keys.
+
+**[`wall-street`](mcp/wall-street/)** (:8812) — live quotes, price history, market indices, and official SEC filings behind 7 tools, for Preston, who deals in public markets and actual numbers. No API keys. He never states a figure he did not fetch, and he never gives investment advice.
+
 ## Design note: approval gates are a game mechanic
 
 The hackathon asks for an interface that shows what the agent is doing, what it is waiting on, and asks before the irreversible step. In a game that is not a modal dialog bolted on top — it is the NPC saying *"I can forge that, but it will cost your last ingot. Shall I?"* and waiting. The approval gate and the dialogue are the same thing.
@@ -131,8 +137,13 @@ Open source, as the hackathon requires.
 npx @truefoundry/trueforge@latest        # 1. harness on :8790 (paste a model key in Settings → Models)
 npm --prefix hub install && npm --prefix hub run dev    # 2. World Hub on :7777
 npm --prefix game install && npm --prefix game run dev  # 3. game on :5173
+npm --prefix mcp/sf-guide install --include=dev && npm --prefix mcp/sf-guide run dev        # 4. SF data MCP on :8811
+npm --prefix mcp/wall-street install --include=dev && npm --prefix mcp/wall-street run dev  # 5. markets MCP on :8812
 node tools/tripo.mjs                     # optional: generate rigged characters (needs TRIPO_API_KEY in .env)
 ```
+
+Both MCP servers need registering in TrueForge once — see the `curl` in each server's README.
+`--include=dev` matters: `NODE_ENV=production` in the shell makes npm skip devDependencies silently.
 
 The game is fully playable with zero keys configured: NPCs fall back to canned lines until
 TrueForge has a model, and characters use kawaii voxel placeholders until Tripo GLBs land.

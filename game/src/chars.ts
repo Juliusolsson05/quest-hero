@@ -73,6 +73,12 @@ const TECH_STYLES: Record<string, TechStyle> = {
   // angel: gray fleece vest, silver hair, sunglasses that never come off
   marcus: { top: 0xb0b4bd, shirt: 0xfdfaf2, pants: 0x46474f, shoes: 0x8a6742,
             hair: 0xd8dde2, skin: 0xe0b68f, headgear: 'silver', sunglasses: true },
+  // markets guy: deep-green puffer vest over a white quarter-zip, gray slacks.
+  // Deliberately a colder, flatter palette than Chad's navy-and-khaki: they
+  // share the 'investor' build, so colour is the only thing telling them apart
+  // across the square.
+  preston: { top: 0x2f5d50, shirt: 0xf4f6f5, pants: 0x767b85, shoes: 0x2e3138,
+             hair: 0x4b3a2a, skin: 0xf7dbb5, headgear: 'slick' },
 };
 
 const LOOK_DEFAULTS: Record<Exclude<NpcLook, 'villager'>, TechStyle> = {

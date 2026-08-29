@@ -18,6 +18,7 @@ import { CartService } from './taxi';
 import { CartlyPhone } from './cartly';
 import { CityFeed } from './feed';
 import { IrsArena, IRS_ARENA } from './arena';
+import { BossFight } from './boss-fight';
 import { Minimap } from './minimap';
 import { Multiplayer } from './mp';
 
@@ -225,14 +226,27 @@ const fadeThrough = (mid: () => void) => {
   setTimeout(() => { mid(); veil.style.opacity = '0'; }, 300);
 };
 
+const fight = new BossFight(scene, irsArena, player, {
+  onAudited: () => fadeThrough(() => {
+    fight.reset();
+    inArena = false;
+    irsKnocked = false;
+    player.setArena(null);
+    player.teleport(new THREE.Vector3(irsDoor.x + 0.8, irsDoor.y, irsDoor.z));
+    ui.toast('you have been audited. it will happen again', '📋');
+  }),
+  toast: (m, e) => ui.toast(m, e),
+});
+
 const enterIrs = () => fadeThrough(() => {
   inArena = true;
   player.setArena(IRS_ARENA.bounds);
   player.teleport(new THREE.Vector3(IRS_ARENA.entrance.x, IRS_ARENA.floorY, IRS_ARENA.entrance.z));
   player.setYaw(0); // walk in facing the taxcollector, not the door you came through
-  ui.toast('the taxcollector looks up from his clipboard', '🧾');
+  fight.begin();
 });
 const leaveIrs = () => fadeThrough(() => {
+  fight.reset();
   inArena = false;
   irsKnocked = false;
   player.setArena(null);
@@ -250,9 +264,12 @@ function nearestPoiLabel(): string {
   return best;
 }
 
+addEventListener('keyup', (e) => { if (e.code === 'Space') fight.setFiring(false); });
+addEventListener('blur', () => fight.setFiring(false));
 addEventListener('keydown', (e) => {
   if (e.code === 'Escape' && ui.questsOpen) ui.closeQuests();
   if (document.body.dataset.typing === '1') return;
+  if (e.code === 'Space' && inArena) { e.preventDefault(); fight.setFiring(true); return; }
   if (e.code === 'KeyP') { phone.setFrom(nearestPoiLabel()); phone.toggle(); return; }
   if (e.code === 'KeyL') { feed.toggle(); return; }
   if (e.code !== 'KeyE') return;
@@ -322,12 +339,16 @@ renderer.setAnimationLoop(() => {
   }
 
   irsArena.update(dt, player.pos);
+  fight.update(dt); // after player + arena so shake lands on the final camera
   if (irsKnocked && !nearIrsDoor()) irsKnocked = false; // walked away; knock again
 
   // Interaction prompt.
   if (document.body.dataset.typing !== '1') {
     const npc = entities.nearestNpc(player.pos, 3.4);
-    if (inArena) ui.setPrompt(irsArena.nearExit(player.pos) ? `<kbd>E</kbd> leave before the audit 🚪` : null);
+    if (inArena)
+      ui.setPrompt(irsArena.nearExit(player.pos)
+        ? `<kbd>E</kbd> leave before the audit 🚪`
+        : fight.active ? `hold <kbd>Space</kbd> to return fire 🔫` : null);
     else if (nearIrsDoor())
       ui.setPrompt(irsKnocked ? `<kbd>E</kbd> meet the taxcollector 🧾` : `<kbd>E</kbd> knock on the IRS door 🚪`);
     else if (carts.nearCart()) ui.setPrompt(`<kbd>E</kbd> hop into the ${carts.cartLabel} 🚕`);

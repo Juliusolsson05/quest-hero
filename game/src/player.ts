@@ -19,7 +19,8 @@ export class Player {
   private island: IslandView | null = null;
   /** When set, movement lives in this rectangular room (the boss arena)
    *  instead of the island grid — a flat floor and four hard walls. */
-  private arena: { minX: number; maxX: number; minZ: number; maxZ: number; y: number } | null = null;
+  private arena: { minX: number; maxX: number; minZ: number; maxZ: number; y: number;
+                   blockers?: { x: number; z: number; r: number }[] } | null = null;
   /** One-frame flag: after a teleport the camera snaps to its new berth
    *  instead of flying there — a cross-map lerp is a guided tour of the void. */
   private camSnap = false;
@@ -102,9 +103,17 @@ export class Player {
       // Axis-separated moves so we slide along blocked tiles and walls instead
       // of sticking; canMove also collides with building footprints. In the
       // arena the room's rectangle is the whole law.
-      const can = (tx: number, tz: number): boolean => this.arena
-        ? tx >= this.arena.minX && tx <= this.arena.maxX && tz >= this.arena.minZ && tz <= this.arena.maxZ
-        : this.island!.canMove(this.pos.x, this.pos.z, tx, tz);
+      const can = (tx: number, tz: number): boolean => {
+        if (!this.arena) return this.island!.canMove(this.pos.x, this.pos.z, tx, tz);
+        if (tx < this.arena.minX || tx > this.arena.maxX || tz < this.arena.minZ || tz > this.arena.maxZ) return false;
+        // Pillars use the island's rule: inward blocked, outward slides free.
+        for (const b of this.arena.blockers ?? []) {
+          const dn = Math.hypot(tx - b.x, tz - b.z);
+          if (dn >= b.r) continue;
+          if (dn < Math.hypot(this.pos.x - b.x, this.pos.z - b.z) - 1e-6) return false;
+        }
+        return true;
+      };
       const nx = this.pos.x + dir.x * speed * dt;
       if (can(nx, this.pos.z)) this.pos.x = nx;
       const nz = this.pos.z + dir.z * speed * dt;

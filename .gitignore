@@ -1,0 +1,23 @@
+# Secrets — never commit an API key. TrueForge keeps its own keys in SQLite
+# outside the repo; anything here is for local tooling only.
+.env
+.env.*
+!.env.example
+*.key
+secrets/
+
+# Node
+node_modules/
+dist/
+build/
+.vite/
+*.tsbuildinfo
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.log
+
+# TrueForge local state (SQLite lives in ~/Library/Application Support/trueforge)
+.trueforge/

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
-import { C } from './world';
-import { angleToward } from './util';
-import { shadedBox as shadedVoxel } from './voxel';
+import { C } from '../world';
+import { angleToward } from '../util';
+import { shadedBox as shadedVoxel } from '../voxel';
 
 /**
  * The IRS audit chamber: a separate room far off the island grid — past the

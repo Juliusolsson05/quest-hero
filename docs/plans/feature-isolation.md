@@ -15,6 +15,16 @@ package.
 
 ## Stages
 
+### 0. (added during execution) Merge origin/main first
+
+Investigation showed `feat/irs-arena` forked *before* main's mobile-controls,
+jump/swim, water-fx and Preston work — nine commits that rewrite the same
+files stages 4–5 restructure. Refactoring the stale base would have made the
+eventual integration worse, so origin/main is merged into this branch ahead of
+the game-side stages and the refactor operates on the union. The merge commit
+documents the non-mechanical resolutions (including two arena×water bugs that
+only exist in the combination).
+
 ### 1. `shared/island.ts` — move the world generator to the boundary
 
 - **Produces**: `shared/island.ts` (generation + pure queries: `island`,

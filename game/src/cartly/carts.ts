@@ -1,8 +1,8 @@
 import * as THREE from 'three';
-import type { IslandView } from './world';
-import type { Player } from './player';
-import { propTemplate } from './props3d';
-import { angleToward } from './util';
+import type { IslandView } from '../world';
+import type { Player } from '../player';
+import { propTemplate } from '../props3d';
+import { angleToward } from '../util';
 
 /**
  * The Cartly fleet. A summoned cart spawns at the Marin vista point, rolls

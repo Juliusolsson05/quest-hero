@@ -3,26 +3,31 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import type { Quest, ServerFrame } from '../../shared/protocol';
 import { island as generatedIsland } from '../../shared/island';
-import { Net } from './net';
-import { buildIsland, IslandView } from './world';
-import { buildDistance } from './distance';
-import { WaterFx } from './water-fx';
-import { Player } from './player';
-import { Entities } from './entities';
 import { Bubbles } from './bubbles';
-import { Atmosphere } from './fx';
-import { Ui } from './ui';
+import { Cartly } from './cartly';
 import { loadManifest } from './chars';
-import { initProps3d } from './props3d';
-import { CartService } from './taxi';
-import { CartlyPhone } from './cartly';
+import { buildDistance } from './distance';
+import { Entities } from './entities';
 import { CityFeed } from './feed';
-import { IrsArena, IRS_ARENA } from './arena';
+import { Atmosphere } from './fx';
+import { HubLink } from './hublink';
+import { IrsEncounter } from './irs';
 import { Minimap } from './minimap';
 import { Multiplayer } from './mp';
+import { Player } from './player';
+import { initProps3d } from './props3d';
 import { TouchControls } from './touch';
+import { Ui } from './ui';
+import { WaterFx } from './water-fx';
+import { buildIsland, IslandView } from './world';
+
+/**
+ * Composition root, and nothing else: construct the modules, hand them their
+ * collaborators, run the frame loop. Feature logic lives with the feature —
+ * the IRS encounter in irs/, ride-hailing in cartly/, every ServerFrame in
+ * hublink.ts. If an edit here is more than wiring, it belongs in a module.
+ */
 
 const COARSE = matchMedia('(pointer: coarse)').matches;
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -41,7 +46,6 @@ const entities = new Entities();
 scene.add(entities.group, player.view.root);
 const bubbles = new Bubbles();
 const ui = new Ui();
-const phone = new CartlyPhone();
 const feed = new CityFeed();
 const minimap = new Minimap();
 new TouchControls(player); // joystick + compact chrome on coarse-pointer devices
@@ -102,204 +106,81 @@ const boardPos: THREE.Vector3 | null = (() => {
   return b ? new THREE.Vector3(b.pos.x, b.pos.y, b.pos.z) : null;
 })();
 
-let npcCount = 0;
-const quests = new Map<string, Quest>();
-
-function pushQuests(): void {
-  const order = { offered: 0, active: 1, done: 2 };
-  ui.setQuests([...quests.values()].sort((a, b) => order[a.state] - order[b.state]));
-}
-
-const net = new Net('traveller');
-
-net.on((f: ServerFrame) => {
-  switch (f.t) {
-    case 'welcome': {
-      ui.setLink(true);
-      phone.setDestinations(f.world.npcs.map((n) => ({ id: n.id, label: `${n.name} the ${n.role}` })));
-      entities.syncNpcs(f.world.npcs);
-      entities.syncAnimals(f.world.animals);
-      entities.syncObjects(f.world.objects);
-      quests.clear();
-      for (const q of f.world.quests) quests.set(q.id, q);
-      pushQuests();
-      fx.setWeather(f.world.weather.kind);
-      fx.setTime(f.world.time.hour, f.world.time.phase);
-      ui.setWeather(f.world.weather);
-      ui.setTime(f.world.time);
-      phone.setWeather(f.world.weather.kind);
-      npcCount = f.world.npcs.length;
-      feed.seed(f.world.recentEvents);
-      feed.setWeather(f.world.weather);
-      feed.setTime(f.world.time);
-      feed.setCounts(npcCount, f.world.quests.filter((q) => q.state !== 'done').length);
-      break;
-    }
-    case 'pose': entities.applyPose(f); break;
-    case 'bubble': {
-      const npc = entities.npc(f.who)?.data;
-      bubbles.push(f.who, npc?.name ?? f.who, npc?.bubbleTint ?? '#fffdf6', f.mode, f.text, f.emotion);
-      if (f.mode !== 'thinking' && f.mode !== 'tool') {
-        feed.addTalk(npc?.name ?? f.who, npc?.bubbleTint ?? '#fffdf6', f.text);
-      }
-      break;
-    }
-    case 'weather':
-      fx.setWeather(f.weather.kind);
-      ui.setWeather(f.weather);
-      phone.setWeather(f.weather.kind);
-      feed.setWeather(f.weather);
-      break;
-    case 'time':
-      fx.setTime(f.time.hour, f.time.phase);
-      ui.setTime(f.time);
-      feed.setTime(f.time);
-      break;
-    case 'object':
-      if (f.op === 'add') entities.addObject(f.object);
-      else entities.removeObject(f.object.id);
-      break;
-    case 'quest':
-      quests.set(f.quest.id, f.quest);
-      pushQuests();
-      feed.setCounts(npcCount, [...quests.values()].filter((q) => q.state !== 'done').length);
-      break;
-    case 'event': {
-      const e = f.event;
-      feed.addEvent(e);
-      if (e.type === 'commit.landed') ui.toast(e.summary, '📦');
-      else if (e.type === 'quest.created') ui.toast(e.summary, '📜');
-      else if (e.type === 'quest.completed') ui.toast(e.summary, '🎉');
-      else if (e.type === 'weather.changed') ui.toast(e.summary, '🌦️');
-      else if (e.type === 'mcp.custom') ui.toast(e.summary, '🛰️');
-      break;
-    }
-  }
-});
-
-// Reconnect watchdog: the welcome frame flips it back on.
-const bootAt = Date.now();
-setInterval(() => ui.setLink(net.connected, Date.now() - bootAt > 8000), 1000);
-
-ui.onSay = (npcId, text) => {
-  net.send({ t: 'talk', npcId, text });
-  bubbles.push('player', 'you', '#e8f7ee', 'commit', text, 'neutral');
-  feed.addTalk('you', '#e8f7ee', text);
-};
-ui.onAccept = (id) => net.send({ t: 'quest', id, action: 'accept' });
-
 // ── the sea ────────────────────────────────────────────────────────────────
 player.onEnterWater = (x, z) => waterFx.splash(x, z, 1);
 player.onLeaveWater = () => waterFx.splash(player.pos.x, player.pos.z, 0.5);
 player.onCurrent = () => ui.toast('the current out here is brutal — best turn back', '🌊');
 
-// ── Cartly: a real cart from the Tripo fleet rolls in over the Golden Gate ──
-const carts = new CartService(scene, player, () => island);
+// ── features ────────────────────────────────────────────────────────────────
+const toast = (text: string, icon: string) => ui.toast(text, icon);
+
+const cartly = new Cartly(scene, player, () => island, {
+  toast,
+  resolveNpc: (id) => {
+    const e = entities.npc(id);
+    return e ? { label: e.data.name, x: e.view.root.position.x, z: e.view.root.position.z } : null;
+  },
+});
+
+const irs = new IrsEncounter(scene, generatedIsland, player, toast);
+
+const hub = new HubLink({ player, entities, ui, fx, bubbles, feed, cartly });
+void hub; // lives for the whole run; every hub effect arrives through its wiring
+
 if (import.meta.env.DEV) { // console-inspection only — never shipped
-  (window as unknown as Record<string, unknown>).__sfq = { island, player, mp, carts };
+  (window as unknown as Record<string, unknown>).__sfq = { island, player, mp, cartly, irs };
 }
-phone.onSummon = (kind) => {
-  void carts.summon(kind);
-  ui.toast(`${carts.cartLabel} summoned — rolling in over the Golden Gate!`, '🚕');
-};
-phone.onCancel = () => carts.cancel();
-// "meet <NPC>" rides: resolve the citizen's live position at boarding time.
-carts.pickDestination = () => {
-  const d = phone.destination;
-  if (d === 'auto') return null;
-  const e = entities.npc(d);
-  if (!e) return null;
-  return { label: e.data.name, x: e.view.root.position.x, z: e.view.root.position.z };
-};
-carts.onEta = (s) => phone.setEta(s);
-carts.onArrived = () => {
-  phone.arrived(carts.cartLabel);
-  ui.toast(`thy ${carts.cartLabel} has arrived — press E to hop in`, '🚕');
-};
-carts.onRideEnd = (dest) => {
-  phone.backToRequest();
-  phone.close();
-  ui.toast(`dropped at ${dest} — 5 stars for the driver? ⭐`, '🚕');
-};
 
-// ── the IRS field office: knock, and meet the taxcollector ─────────────────
-const irsArena = new IrsArena();
-scene.add(irsArena.group);
-const irsDoor = (() => {
-  const p = generatedIsland.pois.find((q) => q.id === 'irs')?.pos ?? { x: 20.6, y: 2, z: 52 };
-  return new THREE.Vector3(p.x, p.y, p.z);
-})();
-let irsKnocked = false;
-let inArena = false;
-const nearIrsDoor = () => irsDoor.distanceTo(player.pos) < 2.6;
+// ── interactions: ONE priority list serves both the E key and the pill ─────
+interface Interactable { prompt(): string | null; act(): boolean }
+const interactables: Interactable[] = [
+  irs,
+  cartly,
+  { // talk to the nearest citizen
+    prompt: () => {
+      const npc = entities.nearestNpc(player.pos, 3.4);
+      return npc ? `<kbd>E</kbd> talk to ${npc.name} 💬` : null;
+    },
+    act: () => {
+      const npc = entities.nearestNpc(player.pos, 3.4);
+      if (!npc) return false;
+      ui.openTalk(npc.id, `${npc.name} · ${npc.role}`);
+      return true;
+    },
+  },
+  { // the notice board
+    prompt: () => (boardPos && boardPos.distanceTo(player.pos) < 3.2 ? `<kbd>E</kbd> read the notice board 📋` : null),
+    act: () => {
+      if (!boardPos || boardPos.distanceTo(player.pos) >= 3.2) return false;
+      ui.openQuests();
+      return true;
+    },
+  },
+];
 
-// A soft black blink for stepping between worlds.
-const veil = document.createElement('div');
-veil.style.cssText =
-  'position:fixed;inset:0;background:#0b0b12;opacity:0;pointer-events:none;transition:opacity .28s;z-index:40';
-document.body.append(veil);
-const fadeThrough = (mid: () => void) => {
-  veil.style.opacity = '1';
-  setTimeout(() => { mid(); veil.style.opacity = '0'; }, 300);
-};
-
-const enterIrs = () => fadeThrough(() => {
-  inArena = true;
-  player.setArena(IRS_ARENA.bounds);
-  player.teleport(new THREE.Vector3(IRS_ARENA.entrance.x, IRS_ARENA.floorY, IRS_ARENA.entrance.z));
-  player.setYaw(0); // walk in facing the taxcollector, not the door you came through
-  ui.toast('the taxcollector looks up from his clipboard', '🧾');
-});
-const leaveIrs = () => fadeThrough(() => {
-  inArena = false;
-  irsKnocked = false;
-  player.setArena(null);
-  player.teleport(new THREE.Vector3(irsDoor.x + 0.8, irsDoor.y, irsDoor.z));
-  ui.toast('you step back into the sunlight. unaudited. for now', '🌤️');
-});
+/** The E action — also fired by tapping the interaction pill on touch. */
+function interact(): void {
+  for (const i of interactables) if (i.act()) return;
+}
+ui.onPromptTap = interact;
 
 function nearestPoiLabel(): string {
   let best = 'the village';
   let bestD = Infinity;
-  for (const p of island?.island.pois ?? []) {
+  for (const p of generatedIsland.pois) {
     const d = (p.pos.x - player.pos.x) ** 2 + (p.pos.z - player.pos.z) ** 2;
     if (d < bestD) { bestD = d; best = p.label; }
   }
   return best;
 }
 
-/** The E action — also fired by tapping the interaction pill on touch. */
-function interact(): void {
-  if (inArena) {
-    if (irsArena.nearExit(player.pos)) leaveIrs();
-    return;
-  }
-  if (nearIrsDoor()) {
-    if (!irsKnocked) {
-      irsKnocked = true;
-      ui.toast('a voice from inside: "COME IN. BRING RECEIPTS."', '🧾');
-    } else enterIrs();
-    return;
-  }
-  if (carts.nearCart()) { carts.board(); phone.close(); return; }
-  const npc = entities.nearestNpc(player.pos, 3.4);
-  if (npc) { ui.openTalk(npc.id, `${npc.name} · ${npc.role}`); return; }
-  if (boardPos && boardPos.distanceTo(player.pos) < 3.2) ui.openQuests();
-}
-ui.onPromptTap = interact;
-
 addEventListener('keydown', (e) => {
   if (e.code === 'Escape' && ui.questsOpen) ui.closeQuests();
   if (document.body.dataset.typing === '1') return;
-  if (e.code === 'KeyP') { phone.setFrom(nearestPoiLabel()); phone.toggle(); return; }
+  if (e.code === 'KeyP') { cartly.togglePhone(nearestPoiLabel()); return; }
   if (e.code === 'KeyL') { feed.toggle(); return; }
   if (e.code === 'KeyE') interact();
 });
-
-// Pose uplink at 10Hz.
-setInterval(() => {
-  if (island) net.send({ t: 'pose', pos: { x: player.pos.x, y: player.pos.y, z: player.pos.z }, rot: player.rot, anim: player.anim });
-}, 100);
 
 const startEl = document.getElementById('start')!;
 startEl.addEventListener('pointerdown', () => startEl.classList.add('hidden')); // tap or click
@@ -331,39 +212,30 @@ renderer.setAnimationLoop(() => {
   }
   const dt = Math.min(clock.getDelta(), 0.1);
   player.update(dt);
-  carts.update(dt); // after player.update so a ride overrides the hero's pose
+  cartly.update(dt); // after player.update so a ride overrides the hero's pose
   entities.update(dt);
   mp.update(dt);
   mp.setPose({ x: player.pos.x, y: player.pos.y, z: player.pos.z, rot: player.rot, anim: player.anim, t: Date.now() });
   if (player.swimming) waterFx.trail(player.pos.x, player.pos.z, player.anim !== 'idle', dt);
   waterFx.update(dt);
   fx.update(dt, player.camera);
+  irs.update(dt);
 
-  if (island) {
-    minimap.update(
-      { x: player.pos.x, z: player.pos.z, rot: player.rot },
-      entities.npcList().map((n) => {
-        const e = entities.npc(n.id)!;
-        return { x: e.view.root.position.x, z: e.view.root.position.z, color: n.bubbleTint || '#ffd3b6' };
-      }),
-      carts.pos ? { x: carts.pos.x, z: carts.pos.z, color: '#ffd977' } : null,
-      mp.dots(),
-    );
-  }
+  minimap.update(
+    { x: player.pos.x, z: player.pos.z, rot: player.rot },
+    entities.npcList().map((n) => {
+      const e = entities.npc(n.id)!;
+      return { x: e.view.root.position.x, z: e.view.root.position.z, color: n.bubbleTint || '#ffd3b6' };
+    }),
+    cartly.cartPos ? { x: cartly.cartPos.x, z: cartly.cartPos.z, color: '#ffd977' } : null,
+    mp.dots(),
+  );
 
-  irsArena.update(dt, player.pos);
-  if (irsKnocked && !nearIrsDoor()) irsKnocked = false; // walked away; knock again
-
-  // Interaction prompt.
+  // Interaction prompt: the first interactable with something to say wins.
   if (document.body.dataset.typing !== '1') {
-    const npc = entities.nearestNpc(player.pos, 3.4);
-    if (inArena) ui.setPrompt(irsArena.nearExit(player.pos) ? `<kbd>E</kbd> leave before the audit 🚪` : null);
-    else if (nearIrsDoor())
-      ui.setPrompt(irsKnocked ? `<kbd>E</kbd> meet the taxcollector 🧾` : `<kbd>E</kbd> knock on the IRS door 🚪`);
-    else if (carts.nearCart()) ui.setPrompt(`<kbd>E</kbd> hop into the ${carts.cartLabel} 🚕`);
-    else if (npc) ui.setPrompt(`<kbd>E</kbd> talk to ${npc.name} 💬`);
-    else if (boardPos && boardPos.distanceTo(player.pos) < 3.2) ui.setPrompt(`<kbd>E</kbd> read the notice board 📋`);
-    else ui.setPrompt(null);
+    let prompt: string | null = null;
+    for (const i of interactables) { prompt = i.prompt(); if (prompt) break; }
+    ui.setPrompt(prompt);
   } else ui.setPrompt(null);
 
   bubbles.update(dt, player.camera, (who) =>

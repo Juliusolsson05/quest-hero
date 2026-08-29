@@ -1,6 +1,6 @@
-import type { WeatherKind } from '../../shared/protocol';
-import { CARTS, type CartKind } from './taxi';
-import { esc } from './util';
+import type { WeatherKind } from '../../../shared/protocol';
+import { CARTS, type CartKind } from './carts';
+import { esc } from '../util';
 
 /**
  * The scrying glass — press P, or tap the bottom-right button. Cartly

@@ -17,7 +17,7 @@
  */
 import type { Emotion, Npc, Quest, QuestStep } from '../../shared/protocol';
 import { CONFIG } from './config';
-import { POI_IDS } from './island';
+import { POI_IDS } from '../../shared/island';
 import { NPC_IDS, npcSeed, type NpcSeed } from './npcs';
 import {
   addEvent,

@@ -31,7 +31,10 @@ export class TouchControls {
     };
     ring.addEventListener('pointerdown', (e) => {
       id = e.pointerId;
-      ring.setPointerCapture(id);
+      // Capture keeps the thumb owned by the stick once it slides off the ring.
+      // Safari can refuse for a pointer it no longer considers active — the
+      // stick still tracks fine without it, so never let that throw kill it.
+      try { ring.setPointerCapture(id); } catch { /* uncaptured is fine */ }
       const r = ring.getBoundingClientRect();
       cx = r.left + r.width / 2;
       cy = r.top + r.height / 2;

@@ -22,7 +22,7 @@ import type {
   World,
   WorldEvent,
 } from '../../shared/protocol';
-import { heightAt, isLand, poi, SPAWN } from './island';
+import { heightAt, isLand, poi, SPAWN } from '../../shared/island';
 import { NPC_SEEDS } from './npcs';
 import { nextId } from './util';
 

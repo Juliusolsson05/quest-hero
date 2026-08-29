@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { AnimName } from '../../shared/protocol';
 import { SEA_Y, type IslandView } from './world';
 import { CharacterView } from './chars';
+import { angleToward } from './util';
 
 /**
  * Third-person controller: the hero walks the island, a spring-arm camera
@@ -28,6 +29,13 @@ export class Player {
   onCurrent: (() => void) | null = null;
 
   private island: IslandView | null = null;
+  /** When set, movement lives in this rectangular room (the boss arena)
+   *  instead of the island grid — a flat floor and four hard walls. */
+  private arena: { minX: number; maxX: number; minZ: number; maxZ: number; y: number;
+                   blockers?: { x: number; z: number; r: number }[] } | null = null;
+  /** One-frame flag: after a teleport the camera snaps to its new berth
+   *  instead of flying there — a cross-map lerp is a guided tour of the void. */
+  private camSnap = false;
   private readonly keys = new Set<string>();
   private readonly pointers = new Map<number, { x: number; y: number }>();
   private readonly mobileMove = new THREE.Vector2();
@@ -106,7 +114,10 @@ export class Player {
         return;
       }
       this.camYaw -= mx * 0.0055;
-      this.camPitch = THREE.MathUtils.clamp(this.camPitch + my * 0.004, 0.12, 1.25);
+      // On the island the camera never dips near-level (terrain would fill
+      // the view); in the arena it must — you cannot aim an SMG at a distant
+      // boss with a crosshair that is always pointed at the floor.
+      this.camPitch = THREE.MathUtils.clamp(this.camPitch + my * 0.004, this.arena ? -0.08 : 0.12, 1.25);
     });
     addEventListener('wheel', (e) => {
       this.camDist = THREE.MathUtils.clamp(this.camDist + Math.sign(e.deltaY) * 0.8, 3.5, 18);
@@ -130,7 +141,11 @@ export class Player {
   /** Drop the hero somewhere else on the island (cart rides, cutscenes). */
   teleport(to: THREE.Vector3): void {
     this.pos.set(to.x, to.y, to.z);
-    if (this.island) {
+    this.camSnap = true;
+    if (this.arena) {
+      this.groundY = this.arena.y;
+      this.pos.y = this.groundY;
+    } else if (this.island) {
       this.groundY = this.island.heightAt(to.x, to.z);
       this.pos.y = this.groundY;
     }
@@ -188,6 +203,16 @@ export class Player {
     }
   }
 
+  /** Enter (or with null, leave) an off-grid room. */
+  setArena(a: Player['arena']): void {
+    this.arena = a;
+  }
+
+  /** Point the camera (cutscene entrances: face the taxcollector, not a wall). */
+  setYaw(yaw: number): void {
+    this.camYaw = yaw;
+  }
+
   update(dt: number): void {
     this.t += dt;
     if (!this.controlled) { this.finish(dt); return; }
@@ -208,29 +233,39 @@ export class Player {
         .applyAxisAngle(new THREE.Vector3(0, 1, 0), this.camYaw);
       // Axis-separated moves so we slide along blocked tiles and walls instead
       // of sticking; passable() covers water, ledges and building footprints.
+      // In the arena the room's rectangle is the whole law — plus the cover
+      // pillars, which use the island's rule: inward blocked, outward free.
+      const can = (tx: number, tz: number): boolean => {
+        if (!this.arena) return this.passable(tx, tz);
+        if (tx < this.arena.minX || tx > this.arena.maxX || tz < this.arena.minZ || tz > this.arena.maxZ) return false;
+        for (const b of this.arena.blockers ?? []) {
+          const dn = Math.hypot(tx - b.x, tz - b.z);
+          if (dn >= b.r) continue;
+          if (dn < Math.hypot(this.pos.x - b.x, this.pos.z - b.z) - 1e-6) return false;
+        }
+        return true;
+      };
       const nx = this.pos.x + dir.x * speed * dt;
-      if (this.passable(nx, this.pos.z)) this.pos.x = nx;
+      if (can(nx, this.pos.z)) this.pos.x = nx;
       const nz = this.pos.z + dir.z * speed * dt;
-      if (this.passable(this.pos.x, nz)) this.pos.z = nz;
+      if (can(this.pos.x, nz)) this.pos.z = nz;
 
-      const target = Math.atan2(dir.x, dir.z);
-      // Shortest-path angle lerp so the hero turns, not spins.
-      let d = target - this.rot;
-      while (d > Math.PI) d -= Math.PI * 2;
-      while (d < -Math.PI) d += Math.PI * 2;
-      this.rot += d * Math.min(1, dt * 14);
+      this.rot = angleToward(this.rot, Math.atan2(dir.x, dir.z), dt * 14);
       // The wire only speaks idle/walk/run; a swimmer reads as walking.
       this.anim = this.swimming ? 'walk' : running ? 'run' : 'walk';
     } else {
       this.anim = 'idle';
     }
     this.applyCurrent(dt);
-    if (this.island) this.groundY = this.island.heightAt(this.pos.x, this.pos.z);
+    // Off the island grid every tile reads as deep water at height 0, so the
+    // arena must supply its own floor — and can never count as sea.
+    if (this.arena) this.groundY = this.arena.y;
+    else if (this.island) this.groundY = this.island.heightAt(this.pos.x, this.pos.z);
 
     // ── in and out of the water ─────────────────────────────────────────────
     // Falling in only counts once you reach the surface, so a jump over a
     // channel stays a jump right up until it isn't.
-    const overWater = this.island ? this.isWater(this.pos.x, this.pos.z) : false;
+    const overWater = this.island && !this.arena ? this.isWater(this.pos.x, this.pos.z) : false;
     if (overWater && !this.swimming && this.pos.y <= SEA_Y + 0.15) {
       this.swimming = true;
       this.airborne = false;
@@ -309,7 +344,7 @@ export class Player {
       Math.cos(this.camYaw) * Math.cos(this.camPitch),
     ).multiplyScalar(this.camDist);
     const wanted = target.clone().add(off);
-    if (this.island) {
+    if (this.island && !this.arena) {
       // When a building would occlude the hero, pull in — but never far enough
       // to end up inside the wall. Past halfway the camera climbs instead, so
       // a hero hard against a row house is filmed over the rooftop.
@@ -321,8 +356,29 @@ export class Player {
       // …and keep the camera above the terrain skin.
       const ch = this.island.heightAt(wanted.x, wanted.z);
       wanted.y = Math.max(wanted.y, ch + 0.6);
+    } else if (this.arena) {
+      // The room is windowless on purpose; the camera never leaves it. Clamp
+      // the spring arm inside the walls and under the ceiling — and when a
+      // wall compresses the arm, drop the camera proportionally so the LOOK
+      // ANGLE survives the pinch. Otherwise backing toward a wall tips the
+      // camera downward and the crosshair dives into the floor at range.
+      const wx = THREE.MathUtils.clamp(wanted.x, this.arena.minX, this.arena.maxX);
+      const wz = THREE.MathUtils.clamp(wanted.z, this.arena.minZ, this.arena.maxZ);
+      if (wx !== wanted.x || wz !== wanted.z) {
+        const dFull = Math.hypot(wanted.x - target.x, wanted.z - target.z);
+        const dPinch = Math.hypot(wx - target.x, wz - target.z);
+        wanted.y = target.y + (wanted.y - target.y) * (dPinch / Math.max(0.001, dFull));
+      }
+      wanted.x = wx;
+      wanted.z = wz;
+      wanted.y = THREE.MathUtils.clamp(wanted.y, this.arena.y + 0.4, this.arena.y + 7.2);
     }
-    this.camera.position.lerp(wanted, Math.min(1, dt * 10));
+    if (this.camSnap) {
+      this.camera.position.copy(wanted);
+      this.camSnap = false;
+    } else {
+      this.camera.position.lerp(wanted, Math.min(1, dt * 10));
+    }
     this.camera.lookAt(target);
   }
 }

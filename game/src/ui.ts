@@ -1,4 +1,5 @@
 import type { Quest, TimeState, WeatherState } from '../../shared/protocol';
+import { esc } from './util';
 
 /** HUD: weather/time chips, event toasts, the talk bar, and the quest board. */
 
@@ -157,8 +158,3 @@ export class Ui {
   }
 }
 
-function esc(s: string): string {
-  const d = document.createElement('div');
-  d.textContent = s;
-  return d.innerHTML;
-}

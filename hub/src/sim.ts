@@ -4,7 +4,8 @@
  * (zero LLM cost — canned pools + tiny scenes every 60-90s).
  */
 import type { Animal, Npc, TimePhase, Vec3 } from '../../shared/protocol';
-import { canStep, findPath, heightAt, isRoad, poi, POI_LABELS, randomWalkableNear } from './island';
+import { canStep, heightAt, isRoad, poi, POI_LABELS, randomWalkableNear } from '../../shared/island';
+import { findPath } from './nav';
 import { NPC_SEEDS, type NpcSeed, type RoutineStop } from './npcs';
 import {
   addEvent,

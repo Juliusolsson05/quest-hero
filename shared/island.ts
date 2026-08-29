@@ -1,8 +1,11 @@
 /**
  * Ashford-by-the-Bay — a 96×96 voxel San Francisco, one voxel = 1m (SPEC §3).
  * The map is *generated* here (coastline distance fields + a street grid +
- * hand-placed landmarks); the hub stays the single source of layout and the
- * client meshes exactly what the welcome frame carries.
+ * hand-placed landmarks), deterministically, which is why this file lives in
+ * shared/: the hub simulates on it and the game meshes it locally without
+ * waiting for (or needing) a hub — same code, same world, both sides. Only
+ * pure generation and queries belong here; hub-side NPC routing is
+ * hub/src/nav.ts, and neither game/ nor hub/ may import the other's src.
  *
  * Tiles:   ~ water   . grass   , dirt   : path   # sidewalk/plaza   s sand
  *          r street asphalt    b Golden Gate deck (walkable, water below)
@@ -14,7 +17,7 @@
  *   z 25-91  the city peninsula: avenues N-S, streets E-W, parks, downtown,
  *            the Embarcadero hugging the bay coast, Twin Peaks in the southwest.
  */
-import type { Island, Prop, PropKind, Vec3 } from '../../shared/protocol';
+import type { Island, Prop, PropKind, Vec3 } from './protocol';
 
 export const SIZE = 96;
 
@@ -190,6 +193,7 @@ const POI_DEFS: { id: string; label: string; x: number; z: number }[] = [
   { id: 'flowerpatch', label: 'the flower patch', x: 23, z: 50.6 },
   { id: 'sfrow', label: 'downtown', x: 62, z: 42 },
   { id: 'gate', label: 'the Golden Gate', x: 42, z: 25.4 },
+  { id: 'irs', label: 'the IRS headquarters', x: 20.6, z: 52 },
 ];
 
 // ── props ───────────────────────────────────────────────────────────────────
@@ -221,6 +225,7 @@ function buildProps(): PropDef[] {
   P.push({ kind: 'flowerpatch', x: 23, z: 50.6 });
   P.push({ kind: 'boat', x: 82.5, z: 33.6, rot: 0.5 });
   P.push({ kind: 'boat', x: 87.5, z: 52.6, rot: -0.7 });
+  P.push({ kind: 'irs', x: 16.5, z: 52, rot: -PI / 2 }); // west outskirts, on solid ground, door facing town
   P.push({ kind: 'rock', x: 40.8, z: 25.4, scale: 0.8 });
   P.push({ kind: 'rock', x: 12.4, z: 60.2, scale: 1.1 });
 
@@ -362,6 +367,7 @@ const PROP_RADII: Partial<Record<PropKind, number>> = {
   coit: 1.3,
   sutro: 1.6,
   sfhouse: 1.2,
+  irs: 4.2,
   shop: 1.3,
   tower: 1.7,
   ferry: 3.0,
@@ -390,88 +396,6 @@ export function blockedMove(x1: number, z1: number, x2: number, z2: number): boo
 /** Can an entity standing at (x1,z1) take a step onto (x2,z2)? */
 export function canStep(x1: number, z1: number, x2: number, z2: number): boolean {
   return walkable(x2, z2, heightAt(x1, z1)) && !blockedMove(x1, z1, x2, z2);
-}
-
-// ── NPC navigation grid ─────────────────────────────────────────────────────
-// A tile is navigable when it's land (roads and sidewalks very much included)
-// and its centre keeps a little clearance from every building footprint, so
-// BFS paths thread the streets and the gaps between houses instead of steering
-// blindly into a wall.
-const NAV: Uint8Array = (() => {
-  const nav = new Uint8Array(SIZE * SIZE);
-  for (let z = 0; z < SIZE; z++)
-    for (let x = 0; x < SIZE; x++)
-      if (TILES[z][x] !== '~') nav[z * SIZE + x] = 1;
-  for (const o of OBSTACLES) {
-    const pad = o.r + 0.25;
-    for (let z = Math.floor(o.z - pad); z <= Math.ceil(o.z + pad); z++) {
-      for (let x = Math.floor(o.x - pad); x <= Math.ceil(o.x + pad); x++) {
-        if (x < 0 || z < 0 || x >= SIZE || z >= SIZE) continue;
-        if (Math.hypot(x + 0.5 - o.x, z + 0.5 - o.z) < pad) nav[z * SIZE + x] = 0;
-      }
-    }
-  }
-  return nav;
-})();
-
-/** Nearest navigable tile index to (x, z) within a few tiles, or -1. */
-function nearestNav(x: number, z: number): number {
-  const tx = Math.floor(x), tz = Math.floor(z);
-  let best = -1;
-  let bestD = Infinity;
-  for (let dz = -3; dz <= 3; dz++) {
-    for (let dx = -3; dx <= 3; dx++) {
-      const nx = tx + dx, nz = tz + dz;
-      if (nx < 0 || nz < 0 || nx >= SIZE || nz >= SIZE || !NAV[nz * SIZE + nx]) continue;
-      const d = (nx + 0.5 - x) ** 2 + (nz + 0.5 - z) ** 2;
-      if (d < bestD) { bestD = d; best = nz * SIZE + nx; }
-    }
-  }
-  return best;
-}
-
-/**
- * BFS route over the nav grid from `from` to `to`: corner waypoints at tile
- * centres, ending with the exact destination. Null when nothing connects them
- * (caller falls back to straight-line steering).
- */
-export function findPath(from: Vec3, to: Vec3): Vec3[] | null {
-  const start = nearestNav(from.x, from.z);
-  const goal = nearestNav(to.x, to.z);
-  if (start < 0 || goal < 0) return null;
-  const exact: Vec3 = { x: to.x, y: heightAt(to.x, to.z), z: to.z };
-  if (start === goal) return [exact];
-  const prev = new Int32Array(SIZE * SIZE).fill(-1);
-  prev[start] = start;
-  const q = [start];
-  for (let qi = 0; qi < q.length && prev[goal] === -1; qi++) {
-    const cur = q[qi];
-    const cx = cur % SIZE;
-    for (const n of [cur - 1, cur + 1, cur - SIZE, cur + SIZE]) {
-      if (n < 0 || n >= SIZE * SIZE || Math.abs((n % SIZE) - cx) > 1) continue;
-      if (!NAV[n] || prev[n] !== -1) continue;
-      prev[n] = cur;
-      q.push(n);
-    }
-  }
-  if (prev[goal] === -1) return null;
-  const cells: [number, number][] = [];
-  for (let cur = goal; ; cur = prev[cur]) {
-    cells.push([cur % SIZE, Math.floor(cur / SIZE)]);
-    if (prev[cur] === cur) break;
-  }
-  cells.reverse();
-  const wp: Vec3[] = [];
-  for (let i = 1; i < cells.length; i++) { // skip the start cell
-    if (i < cells.length - 1) { // keep corners, drop straightaways
-      const [ax, az] = cells[i - 1], [bx, bz] = cells[i], [cx2, cz2] = cells[i + 1];
-      if (bx - ax === cx2 - bx && bz - az === cz2 - bz) continue;
-    }
-    const px = cells[i][0] + 0.5, pz = cells[i][1] + 0.5;
-    wp.push({ x: px, y: heightAt(px, pz), z: pz });
-  }
-  wp.push(exact);
-  return wp;
 }
 
 export const island: Island = {

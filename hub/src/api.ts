@@ -6,8 +6,9 @@
 import type { Express, Request, Response } from 'express';
 import type { Emotion, ObjectKind, Quest, TimePhase, Vec3, WeatherKind } from '../../shared/protocol';
 import { chatterStatus, forceChatter } from './chatter';
-import { getConversation, talk, validateSteps } from './dialogue';
-import { heightAt, island, NEAR_TARGETS, poi, POI_IDS, randomWalkableNear } from './island';
+import { getConversation, talk } from './dialogue';
+import { validateSteps } from './scribe';
+import { heightAt, island, NEAR_TARGETS, poi, POI_IDS, randomWalkableNear } from '../../shared/island';
 import { overrideTime, overrideWeather, resumeAutoWeather, resumeRealTime } from './ingest';
 import { sendNpcTo } from './sim';
 import {

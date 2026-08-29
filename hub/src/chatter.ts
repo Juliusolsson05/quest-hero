@@ -11,7 +11,7 @@
  * join in with the normal talk flow at any moment.
  */
 import type { Emotion } from '../../shared/protocol';
-import { resolveModel, sessionFor, streamTurn } from './dialogue';
+import { resolveModel, sessionFor, streamTurn } from './trueforge';
 import { holdFacing, releaseFromChat, summonForChat } from './sim';
 import {
   EMOTIONS,

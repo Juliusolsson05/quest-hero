@@ -147,6 +147,18 @@ export interface TurnCallbacks {
   onActivity?: () => void;
 }
 
+/** A gated tool call that paused the turn, awaiting an allow/deny decision. */
+export interface PendingApproval {
+  threadId: string;
+  toolCallId: string;
+}
+
+/** One turn input item: a user message, or an approval decision that resumes a
+ *  turn paused on a gated tool call (wire format is snake_case). */
+type TurnInput =
+  | { type: 'user.message'; content: string }
+  | { type: 'user.tool_approval'; thread_id: string; tool_call_id: string; approval: { status: 'allow' | 'deny'; reason?: string } };
+
 function toolDetail(c: ToolCallAcc): string | null {
   if (!c.args) return null;
   try {
@@ -159,15 +171,19 @@ function toolDetail(c: ToolCallAcc): string | null {
   }
 }
 
-export async function streamTurn(sessionId: string, content: string, cb: TurnCallbacks, signal: AbortSignal): Promise<void> {
+/** Stream one turn of arbitrary input items, returning any tool calls the turn
+ *  paused on (gated tools awaiting approval). The primitive behind both
+ *  streamTurn and the auto-approve loop. */
+async function streamInput(sessionId: string, input: TurnInput[], cb: TurnCallbacks, signal: AbortSignal): Promise<PendingApproval[]> {
   const res = await fetch(`${BASE}/api/v1/sessions/${sessionId}/turns?stream=true`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', accept: 'text/event-stream' },
-    body: JSON.stringify({ input: [{ type: 'user.message', content }] }),
+    body: JSON.stringify({ input }),
     signal,
   });
   if (!res.ok || !res.body) throw new HarnessUnavailable(`turn: ${res.status}`);
 
+  const pending: PendingApproval[] = [];
   const calls = new Map<string, ToolCallAcc>();
   const indexToId = new Map<number, string>();
 
@@ -182,6 +198,12 @@ export async function streamTurn(sessionId: string, content: string, cb: TurnCal
   };
 
   const handleEvent = (evt: Record<string, any>): void => {
+    if (evt?.type === 'tool.approval_required') {
+      for (const tc of Array.isArray(evt.tool_calls) ? evt.tool_calls : []) {
+        if (tc?.id) pending.push({ threadId: evt.thread_id ?? 'main', toolCallId: tc.id });
+      }
+      return;
+    }
     if (evt?.type === 'mcp.initialize') {
       const names = (Array.isArray(evt.mcp_servers) ? evt.mcp_servers : [])
         .map((s: { name?: string }) => s?.name)
@@ -246,4 +268,29 @@ export async function streamTurn(sessionId: string, content: string, cb: TurnCal
       }
     }
   }
+  return pending;
+}
+
+export async function streamTurn(sessionId: string, content: string, cb: TurnCallbacks, signal: AbortSignal): Promise<void> {
+  await streamInput(sessionId, [{ type: 'user.message', content }], cb, signal);
+}
+
+/**
+ * Stream a turn and auto-approve every gated tool call it pauses on, resuming
+ * until the turn settles. For unattended, trusted flows (e.g. the user
+ * registrar) where a strict persona — not a human — is the guard rail; do NOT
+ * use it for player-facing NPCs whose approval gate is the game mechanic.
+ */
+export async function streamTurnAutoApprove(sessionId: string, content: string, cb: TurnCallbacks, signal: AbortSignal): Promise<void> {
+  let pending = await streamInput(sessionId, [{ type: 'user.message', content }], cb, signal);
+  for (let hop = 0; pending.length && hop < 8; hop++) {
+    const input: TurnInput[] = pending.map((p) => ({
+      type: 'user.tool_approval',
+      thread_id: p.threadId,
+      tool_call_id: p.toolCallId,
+      approval: { status: 'allow' },
+    }));
+    pending = await streamInput(sessionId, input, cb, signal);
+  }
+  if (pending.length) throw new HarnessUnavailable('approval loop did not settle');
 }

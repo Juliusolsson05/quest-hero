@@ -27,6 +27,9 @@ export const CONFIG = {
   /** '' = auto-pick the first model from GET /api/v1/models */
   trueforgeModel: process.env.TRUEFORGE_MODEL ?? '',
   githubRepo: process.env.GITHUB_REPO ?? 'Juliusolsson05/quest-hero',
+  /** Supabase project ref whose public.users table gets a row per join
+   *  (through TrueForge's supabase MCP connector); '' disables the recorder. */
+  supabaseProjectRef: process.env.SUPABASE_PROJECT_REF ?? 'hcohxobwnwvvmvlbrnkr',
   weatherLat: Number(process.env.WEATHER_LAT ?? 37.77),
   weatherLon: Number(process.env.WEATHER_LON ?? -122.42),
 } as const;

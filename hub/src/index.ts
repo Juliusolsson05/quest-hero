@@ -24,6 +24,7 @@ import {
   updatePlayerPose,
   worldSnapshot,
 } from './state';
+import { recordUserJoin } from './users';
 
 const app = express();
 app.use(cors());
@@ -62,9 +63,13 @@ wss.on('connection', (ws) => {
     }
     try {
       switch (frame.t) {
-        case 'hello':
-          playerHello(typeof frame.name === 'string' ? frame.name : 'Traveller');
+        case 'hello': {
+          const p = playerHello(typeof frame.name === 'string' ? frame.name : 'Traveller');
+          // The join is the signup: mirror the hero into Supabase's users table
+          // through TrueForge's supabase MCP (fire-and-forget, fail-soft).
+          recordUserJoin(p.name);
           break;
+        }
         case 'pose':
           updatePlayerPose(frame.pos, frame.rot, frame.anim);
           break;

@@ -123,6 +123,9 @@ const POI_DEFS: { id: string; label: string; x: number; z: number }[] = [
   { id: 'mailbox', label: 'the mailbox', x: 35, z: 26 },
   { id: 'pen', label: 'the chicken pen', x: 35, z: 11 },
   { id: 'flowerpatch', label: 'the flower patch', x: 19, z: 14 },
+  // Little San Francisco — the tech crowd's quarter on the southwest green
+  { id: 'sfrow', label: 'Little San Francisco', x: 14, z: 29.5 },
+  { id: 'gate', label: 'the Golden Gate', x: 24, z: 32 },
 ];
 
 const PROP_DEFS: { kind: PropKind; x: number; z: number; rot?: number; scale?: number }[] = [
@@ -135,7 +138,7 @@ const PROP_DEFS: { kind: PropKind; x: number; z: number; rot?: number; scale?: n
   { kind: 'tree', x: 19.4, z: 37.4 },
   { kind: 'tree', x: 31.4, z: 36.4 },
   { kind: 'tree', x: 10.4, z: 24.4 },
-  { kind: 'tree', x: 16.4, z: 31.4 },
+  { kind: 'tree', x: 19.6, z: 33.6 },
   { kind: 'pine', x: 20, z: 7 },
   { kind: 'pine', x: 25, z: 10 },
   { kind: 'lamp', x: 20, z: 20 },
@@ -164,6 +167,20 @@ const PROP_DEFS: { kind: PropKind; x: number; z: number; rot?: number; scale?: n
   { kind: 'flowerpatch', x: 18.4, z: 13.5 },
   { kind: 'shrine', x: 21, z: 8 },
   { kind: 'well', x: 24, z: 9 },
+  // ── Little San Francisco ──
+  // Postcard row on the southwest green, facing north toward the plaza.
+  { kind: 'paintedladies', x: 14, z: 31.8, rot: Math.PI },
+  { kind: 'transamerica', x: 10.8, z: 27.2 },
+  { kind: 'salesforce', x: 17.2, z: 27.4 },
+  // Coit on the east shoulder of the shrine hill, Sutro looming behind it —
+  // exactly where they belong: on the skyline.
+  { kind: 'coit', x: 27.5, z: 8.5 },
+  { kind: 'sutro', x: 19, z: 9.8 },
+  // The Golden Gate spans the south channel, right over the causeway the
+  // player already walks — towers straddle the road, cables overhead.
+  { kind: 'goldengate', x: 24, z: 36.5 },
+  // A cable car parked on the plaza–market road.
+  { kind: 'cablecar', x: 30.5, z: 24.5 },
 ];
 
 /** Height (in blocks) of the column under world position (x, z); water is 0. */
@@ -218,14 +235,54 @@ export const POI_LABELS: Record<string, string> = Object.fromEntries(POI_DEFS.ma
 /** The 'near' anchors accepted by POST /api/objects. */
 export const NEAR_TARGETS = ['plaza', 'forge', 'market', 'farm', 'docks', 'hill'] as const;
 
-/** A random walkable point within radius of (x, z); falls back to the anchor itself. */
+/**
+ * Rough footprint radii for solid props — standing spots keep out of these so
+ * nobody idles inside the fountain or halfway through a house wall. Walk-in
+ * or thin props (pen, fences, the Golden Gate span, flower patch) are absent
+ * on purpose.
+ */
+const PROP_RADII: Partial<Record<PropKind, number>> = {
+  fountain: 1.5,
+  forge: 1.5,
+  anvil: 0.6,
+  house: 1.7,
+  stall: 1.3,
+  well: 1.0,
+  shrine: 1.1,
+  boat: 1.6,
+  rock: 0.7,
+  tree: 0.55,
+  pine: 0.6,
+  lamp: 0.4,
+  board: 0.6,
+  mailbox: 0.4,
+  cablecar: 1.5,
+  paintedladies: 1.9,
+  transamerica: 1.6,
+  salesforce: 1.6,
+  coit: 1.3,
+  sutro: 1.6,
+};
+
+const OBSTACLES = PROP_DEFS.flatMap((p) => {
+  const r = PROP_RADII[p.kind];
+  return r ? [{ x: p.x, z: p.z, r: r * (p.scale ?? 1) }] : [];
+});
+
+/** True when (x, z) is outside every solid prop's footprint. */
+export function isOpenSpot(x: number, z: number): boolean {
+  for (const o of OBSTACLES) if (Math.hypot(x - o.x, z - o.z) < o.r) return false;
+  return true;
+}
+
+/** A random open walkable point within radius of (x, z); falls back to the anchor itself. */
 export function randomWalkableNear(x: number, z: number, radius = 2.5): Vec3 {
-  for (let i = 0; i < 24; i++) {
+  for (let i = 0; i < 32; i++) {
     const a = Math.random() * Math.PI * 2;
     const r = 0.5 + Math.random() * radius;
     const nx = Math.round((x + Math.sin(a) * r) * 10) / 10;
     const nz = Math.round((z + Math.cos(a) * r) * 10) / 10;
-    if (isLand(nx, nz)) return { x: nx, y: heightAt(nx, nz), z: nz };
+    if (isLand(nx, nz) && isOpenSpot(nx, nz)) return { x: nx, y: heightAt(nx, nz), z: nz };
   }
   return { x, y: heightAt(x, z), z };
 }

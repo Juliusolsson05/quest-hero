@@ -22,7 +22,7 @@ import type {
   World,
   WorldEvent,
 } from '../../shared/protocol';
-import { heightAt, poi, SPAWN } from './island';
+import { heightAt, isLand, poi, SPAWN } from './island';
 import { NPC_SEEDS } from './npcs';
 import { nextId } from './util';
 
@@ -53,19 +53,26 @@ export const TIME_PHASES: TimePhase[] = ['dawn', 'day', 'dusk', 'night'];
 
 // ── the world ───────────────────────────────────────────────────────────────
 
-const npcs: Npc[] = NPC_SEEDS.map((seed) => {
+const npcs: Npc[] = NPC_SEEDS.map((seed, i) => {
   const home = poi(seed.home)!;
+  // Fan out on a golden-angle ring so housemates never spawn stacked.
+  const ang = i * 2.399963;
+  const r = 1.3 + (i % 3) * 0.6;
+  let x = home.pos.x + Math.sin(ang) * r;
+  let z = home.pos.z + Math.cos(ang) * r;
+  if (!isLand(x, z)) ({ x, z } = home.pos);
   return {
     id: seed.id,
     name: seed.name,
     role: seed.role,
-    pos: { ...home.pos },
-    rot: 0,
+    pos: { x, y: heightAt(x, z), z },
+    rot: ang,
     anim: 'idle',
     activity: 'settling in for the day',
     mood: 'neutral',
     persona: seed.persona,
     bubbleTint: seed.bubbleTint,
+    look: seed.look ?? 'villager',
   };
 });
 

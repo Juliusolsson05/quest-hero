@@ -23,6 +23,10 @@ import { dist2d, pick, rand, round2 } from './util';
 
 const TICK_MS = 100;
 const NPC_SPEED = 1.6; // m/s
+const STROLL_SPEED = 0.9; // m/s — casual shuffle while lingering at a stop
+const NPC_MIN_GAP = 1.0; // m — closer than this reads as "standing inside each other"
+const SPOT_GAP = 1.6; // m — min spacing between chosen standing spots
+const STOP_RADIUS = 2.8; // m — how widely a routine stop fans out around its POI
 
 // ── NPC runtime ─────────────────────────────────────────────────────────────
 
@@ -35,9 +39,47 @@ interface NpcRt {
   dwellUntil: number;
   /** POI forced via POST /api/npcs/:id/goto — overrides the routine once */
   forced: string | null;
+  /** short shuffle to a nearby spot while dwelling — does not touch the routine */
+  stroll: Vec3 | null;
+  /** hard hold (chat choreography): no strolling, no new stops, keep facing */
+  parkedUntil: number;
+  /** next time the idle-life roll fires (stroll / glance / funny fidget) */
+  nextIdleAt: number;
 }
 
 const npcRts: NpcRt[] = [];
+
+/** Spots other NPCs have claimed: where they stand, or where they are headed. */
+function claimedSpots(except: NpcRt): Vec3[] {
+  const spots: Vec3[] = [];
+  for (const o of npcRts) {
+    if (o === except) continue;
+    spots.push(o.stroll ?? o.target ?? o.npc.pos);
+  }
+  return spots;
+}
+
+/**
+ * A walkable open spot near (x, z) that keeps SPOT_GAP from every other NPC's
+ * claimed spot — so a crowded POI fans out into a loose group instead of a
+ * pile. Falls back to the least-cramped sample when the area is packed.
+ */
+function pickSpotNear(rt: NpcRt, x: number, z: number, radius: number): Vec3 {
+  let best: Vec3 | null = null;
+  let bestScore = -1;
+  const others = claimedSpots(rt);
+  for (let i = 0; i < 16; i++) {
+    const c = randomWalkableNear(x, z, radius);
+    let nearest = Infinity;
+    for (const s of others) nearest = Math.min(nearest, dist2d(c.x, c.z, s.x, s.z));
+    if (nearest >= SPOT_GAP) return c;
+    if (nearest > bestScore) {
+      bestScore = nearest;
+      best = c;
+    }
+  }
+  return best ?? randomWalkableNear(x, z, radius);
+}
 
 function pickStop(rt: NpcRt, phase: TimePhase): RoutineStop {
   const stops = rt.seed.routine[phase];
@@ -88,12 +130,46 @@ function stepToward(e: { pos: Vec3; rot: number }, target: Vec3, speed: number, 
   return false; // boxed in — hold still this tick
 }
 
+/**
+ * Idle life while dwelling at a stop: shuffle to a fresh nearby spot, glance
+ * at a neighbor or off into the distance, or do something quietly ridiculous
+ * (the seed's fidget pool) so nobody stands frozen for a minute straight.
+ */
+function idleLife(rt: NpcRt, now: number): void {
+  if (now < rt.nextIdleAt) return;
+  rt.nextIdleAt = now + rand(8_000, 18_000);
+  const { npc } = rt;
+  const roll = Math.random();
+  if (roll < 0.4 && rt.stop) {
+    const p = poi(rt.stop.poi);
+    if (p) rt.stroll = pickSpotNear(rt, p.pos.x, p.pos.z, STOP_RADIUS);
+  } else if (roll < 0.65 && rt.seed.fidgets.length) {
+    setActivity(npc, pick(rt.seed.fidgets));
+  } else {
+    // people-watch: face the nearest neighbor when one is close, else gaze off
+    let nearest: Npc | null = null;
+    let nd = 7;
+    for (const o of npcRts) {
+      if (o === rt) continue;
+      const d = dist2d(npc.pos.x, npc.pos.z, o.npc.pos.x, o.npc.pos.z);
+      if (d < nd) {
+        nd = d;
+        nearest = o.npc;
+      }
+    }
+    npc.rot = nearest
+      ? Math.atan2(nearest.pos.x - npc.pos.x, nearest.pos.z - npc.pos.z)
+      : rand(0, Math.PI * 2);
+  }
+}
+
 function tickNpc(rt: NpcRt, now: number, dt: number, phase: TimePhase): void {
   const { npc } = rt;
   if (phase !== rt.phase && !rt.forced) {
     rt.phase = phase;
     rt.stop = null;
     rt.target = null;
+    rt.stroll = null;
     rt.dwellUntil = 0; // phase change: pick a fresh stop right away
   }
 
@@ -101,7 +177,9 @@ function tickNpc(rt: NpcRt, now: number, dt: number, phase: TimePhase): void {
     npc.anim = 'walk';
     if (stepToward(npc, rt.target, NPC_SPEED, dt)) {
       rt.target = null;
+      rt.stroll = null;
       rt.dwellUntil = now + rand(20_000, 60_000);
+      rt.nextIdleAt = now + rand(5_000, 12_000);
       npc.anim = 'idle';
       if (rt.forced) {
         const label = POI_LABELS[rt.forced] ?? rt.forced;
@@ -114,14 +192,33 @@ function tickNpc(rt: NpcRt, now: number, dt: number, phase: TimePhase): void {
     return;
   }
 
+  // parked for a conversation — hold the pose, keep facing the other speaker
+  if (now < rt.parkedUntil) {
+    npc.anim = 'idle';
+    return;
+  }
+
+  // mid-dwell shuffle: amble a few steps without touching the routine
+  if (rt.stroll) {
+    npc.anim = 'walk';
+    if (stepToward(npc, rt.stroll, STROLL_SPEED, dt)) {
+      rt.stroll = null;
+      npc.anim = 'idle';
+    }
+    return;
+  }
+
   npc.anim = 'idle';
-  if (now < rt.dwellUntil) return;
+  if (now < rt.dwellUntil) {
+    idleLife(rt, now);
+    return;
+  }
 
   const stop = pickStop(rt, phase);
   rt.stop = stop;
   const p = poi(stop.poi);
   if (!p) return;
-  rt.target = randomWalkableNear(p.pos.x, p.pos.z, 1.6);
+  rt.target = pickSpotNear(rt, p.pos.x, p.pos.z, STOP_RADIUS);
   if (dist2d(npc.pos.x, npc.pos.z, rt.target.x, rt.target.z) > 2) {
     setActivity(npc, `walking to ${POI_LABELS[stop.poi] ?? stop.poi}`);
   }
@@ -134,7 +231,9 @@ export function sendNpcTo(npcId: string, poiId: string): Npc | undefined {
   if (!rt || !p) return undefined;
   rt.forced = poiId;
   rt.stop = null;
-  rt.target = randomWalkableNear(p.pos.x, p.pos.z, 1.4);
+  rt.stroll = null;
+  rt.parkedUntil = 0;
+  rt.target = pickSpotNear(rt, p.pos.x, p.pos.z, 1.8);
   rt.dwellUntil = 0;
   setActivity(rt.npc, `walking to ${POI_LABELS[poiId] ?? poiId}`);
   return rt.npc;
@@ -142,18 +241,31 @@ export function sendNpcTo(npcId: string, poiId: string): Npc | undefined {
 
 // ── NPC↔NPC chatter choreography (used by chatter.ts) ──────────────────────
 
+/** A spot a polite conversational distance (≥0.9m) from `pos`. */
+function chatSpotNear(pos: Vec3): Vec3 {
+  for (let i = 0; i < 12; i++) {
+    const c = randomWalkableNear(pos.x, pos.z, 1.3);
+    if (dist2d(c.x, c.z, pos.x, pos.z) >= 0.9) return c;
+  }
+  return randomWalkableNear(pos.x, pos.z, 1.3);
+}
+
 /** Walk `a` over to `b`; `b` waits in place. Returns false if either is unknown. */
 export function summonForChat(aId: string, bId: string): boolean {
   const ra = npcRts.find((r) => r.npc.id === aId);
   const rb = npcRts.find((r) => r.npc.id === bId);
   if (!ra || !rb) return false;
   rb.target = null;
+  rb.stroll = null;
   rb.forced = null;
-  rb.dwellUntil = Date.now() + 40_000; // long enough for the walk over
+  rb.parkedUntil = Date.now() + 40_000; // long enough for the walk over
+  rb.dwellUntil = rb.parkedUntil;
   ra.forced = null;
   ra.stop = null;
+  ra.stroll = null;
+  ra.parkedUntil = 0;
   ra.dwellUntil = 0;
-  ra.target = randomWalkableNear(rb.npc.pos.x, rb.npc.pos.z, 1.3);
+  ra.target = chatSpotNear(rb.npc.pos);
   setActivity(ra.npc, `heading over to ${rb.npc.name}`);
   return true;
 }
@@ -166,7 +278,9 @@ export function holdFacing(aId: string, bId: string, holdMs: number): void {
   const until = Date.now() + holdMs;
   for (const [me, other] of [[ra, rb], [rb, ra]] as const) {
     me.target = null;
+    me.stroll = null;
     me.forced = null;
+    me.parkedUntil = until;
     me.dwellUntil = until;
     me.npc.anim = 'idle';
     me.npc.rot = Math.atan2(other.npc.pos.x - me.npc.pos.x, other.npc.pos.z - me.npc.pos.z);
@@ -178,7 +292,48 @@ export function holdFacing(aId: string, bId: string, holdMs: number): void {
 export function releaseFromChat(ids: string[]): void {
   for (const id of ids) {
     const rt = npcRts.find((r) => r.npc.id === id);
-    if (rt) rt.dwellUntil = Date.now() + rand(2_000, 6_000);
+    if (!rt) continue;
+    rt.parkedUntil = 0;
+    rt.dwellUntil = Date.now() + rand(2_000, 6_000);
+  }
+}
+
+/**
+ * Personal space: any two NPCs closer than NPC_MIN_GAP get eased apart along
+ * the line between them (capped speed, so it reads as a polite shuffle, not a
+ * teleport). The push is axial, so a chatting pair keeps facing each other.
+ */
+function separateNpcs(dt: number): void {
+  for (let i = 0; i < npcRts.length; i++) {
+    for (let j = i + 1; j < npcRts.length; j++) {
+      const a = npcRts[i].npc;
+      const b = npcRts[j].npc;
+      let dx = b.pos.x - a.pos.x;
+      let dz = b.pos.z - a.pos.z;
+      const d = Math.hypot(dx, dz);
+      if (d >= NPC_MIN_GAP) continue;
+      if (d < 1e-4) {
+        // perfectly stacked: deterministic angle so the pair always resolves
+        const ang = i * 2.4 + j * 1.7;
+        dx = Math.sin(ang);
+        dz = Math.cos(ang);
+      } else {
+        dx /= d;
+        dz /= d;
+      }
+      const step = Math.min(1.2 * dt, (NPC_MIN_GAP - d) * 0.5 + 0.01);
+      for (const [e, s] of [
+        [a, -step],
+        [b, step],
+      ] as const) {
+        const nx = e.pos.x + dx * s;
+        const nz = e.pos.z + dz * s;
+        if (!canStep(e.pos.x, e.pos.z, nx, nz)) continue;
+        e.pos.x = nx;
+        e.pos.z = nz;
+        e.pos.y = heightAt(nx, nz);
+      }
+    }
   }
 }
 
@@ -331,7 +486,7 @@ function ambientBubbleScene(): void {
 
 function runDirector(now: number): void {
   if (now < nextAmbientAt) return;
-  nextAmbientAt = now + rand(60_000, 90_000);
+  nextAmbientAt = now + rand(45_000, 75_000);
   const roll = Math.random();
   if (roll < 0.5) ambientBubbleScene();
   else if (roll < 0.75) catChaseScene();
@@ -347,7 +502,18 @@ export function startSim(): void {
 
   for (const seed of NPC_SEEDS) {
     const npc = getNpc(seed.id)!;
-    npcRts.push({ seed, npc, phase: getTime().phase, stop: null, target: null, dwellUntil: 0, forced: null });
+    npcRts.push({
+      seed,
+      npc,
+      phase: getTime().phase,
+      stop: null,
+      target: null,
+      dwellUntil: 0,
+      forced: null,
+      stroll: null,
+      parkedUntil: 0,
+      nextIdleAt: 0,
+    });
   }
   for (const a of listAnimals()) {
     if (a.kind === 'chicken') chickens.push({ a, mode: 'peck', until: 0, target: null, escapedUntil: 0 });
@@ -362,7 +528,7 @@ export function startSim(): void {
         switchAt: Date.now() + rand(40_000, 90_000),
       });
   }
-  nextAmbientAt = Date.now() + rand(60_000, 90_000);
+  nextAmbientAt = Date.now() + rand(45_000, 75_000);
 
   let last = Date.now();
   timer = setInterval(() => {
@@ -372,6 +538,7 @@ export function startSim(): void {
     const phase = getTime().phase;
 
     for (const rt of npcRts) tickNpc(rt, now, dt, phase);
+    separateNpcs(dt);
     for (const c of chickens) tickChicken(c, now, dt);
     if (cat) tickCat(cat, now, dt);
     for (const f of flies) tickFly(f, now);

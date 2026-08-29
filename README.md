@@ -139,4 +139,8 @@ TrueForge has a model, and characters use kawaii voxel placeholders until Tripo 
 
 ## Status
 
-Specs frozen (docs/SPEC.md), World Hub + voxel third-person client implemented, wiring in progress.
+Specs frozen (docs/SPEC.md). World Hub + voxel third-person client implemented and integrated:
+real SF weather and time drive the island, REST writes (weather/objects/npc say) appear in-game
+within a tick, and pushed commits land as delivery crates that Wren announces. Dialogue runs on
+canned fallbacks until a model key is pasted into TrueForge (Settings → Models); Tripo characters
+pending a valid `TRIPO_API_KEY` (kawaii voxel placeholders meanwhile).

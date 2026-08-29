@@ -31,6 +31,11 @@ export interface WorldEvent {
   data?: Record<string, unknown>;
 }
 
+/** Which voxel build the client uses for a character. 'villager' is the
+ *  classic box-person; the tech looks carry hand props (phone / laptop /
+ *  coffee) and their own idle animations. */
+export type NpcLook = 'villager' | 'techbro-phone' | 'techbro-laptop' | 'investor';
+
 export interface Npc {
   id: string;
   name: string;
@@ -42,6 +47,7 @@ export interface Npc {
   mood: Emotion;
   persona: string;
   bubbleTint: string; // pastel hex for this NPC's bubbles
+  look?: NpcLook; // default 'villager'
 }
 
 export type AnimalKind = 'cat' | 'chicken' | 'butterfly';
@@ -114,7 +120,10 @@ export interface World {
 export type PropKind =
   | 'tree' | 'pine' | 'lamp' | 'fence' | 'stall' | 'fountain' | 'board'
   | 'forge' | 'anvil' | 'house' | 'mailbox' | 'pen' | 'boat' | 'rock'
-  | 'flowerpatch' | 'shrine' | 'well';
+  | 'flowerpatch' | 'shrine' | 'well'
+  // Little San Francisco — recognizable landmarks, kawaii-voxel scale
+  | 'goldengate' | 'transamerica' | 'salesforce' | 'paintedladies'
+  | 'coit' | 'sutro' | 'cablecar';
 export interface Prop { kind: PropKind; pos: Vec3; rot?: number; scale?: number }
 
 /** Static island description sent once in the welcome frame. */

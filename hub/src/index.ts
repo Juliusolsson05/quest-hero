@@ -12,7 +12,7 @@ import type { ClientFrame, ServerFrame } from '../../shared/protocol';
 import { mountApi } from './api';
 import { startChatter } from './chatter';
 import { CONFIG } from './config';
-import { talk } from './dialogue';
+import { registerAgents, talk } from './dialogue';
 import { startIngest } from './ingest';
 import { island } from './island';
 import { engagePlayer, startSim } from './sim';
@@ -97,4 +97,6 @@ server.listen(CONFIG.port, () => {
   startSim();
   startIngest();
   startChatter();
+  // Every villager becomes a named agent in the TrueForge Agent Library.
+  void registerAgents();
 });

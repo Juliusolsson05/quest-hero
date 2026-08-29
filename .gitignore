@@ -3,6 +3,9 @@
 .env
 .env.*
 !.env.example
+
+# TrueForge session-id cache (NPC memory survives hub restarts; machine-local)
+hub/.trueforge-sessions.json
 *.key
 secrets/
 

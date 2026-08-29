@@ -11,7 +11,7 @@
  * join in with the normal talk flow at any moment.
  */
 import type { Emotion } from '../../shared/protocol';
-import { resolveModel, sessionFor, streamTurn } from './dialogue';
+import { type AgentDef, ensureAgent, sessionFor, streamTurn, userMessage } from './harness';
 import { holdFacing, releaseFromChat, summonForChat } from './sim';
 import {
   EMOTIONS,
@@ -42,13 +42,11 @@ let nextAt = Date.now() + 60_000;
 
 // ── plumbing ────────────────────────────────────────────────────────────────
 
-async function agentText(key: string, persona: string, model: string,
-                         connectors: string[], prompt: string, timeoutMs = 75_000): Promise<string> {
+async function agentText(key: string, def: AgentDef, prompt: string, timeoutMs = 75_000): Promise<string> {
   const signal = AbortSignal.timeout(timeoutMs);
-  const sid = await sessionFor(key, { persona, model, connectors }, signal);
-  let out = '';
-  await streamTurn(sid, prompt, { onDelta: (c) => { out += c; } }, signal);
-  return out;
+  const sid = await sessionFor(key, def, signal);
+  const result = await streamTurn(sid, userMessage(prompt), { onDelta: () => {} }, signal);
+  return result.text;
 }
 
 function extractJson<T>(raw: string): T | null {
@@ -60,9 +58,26 @@ function extractJson<T>(raw: string): T | null {
 
 // ── the reporter: this week's real SF/tech happenings ───────────────────────
 
-const REPORTER_PERSONA =
-  'You are a news scout for a video game. You research with your tools and reply ' +
-  'ONLY with the exact JSON asked for — no prose, no code fences.';
+/** The news scout: a JSON-mode agent with real search + city-data tools —
+ *  and subagents on, so it can fan the beat reporters out in parallel. */
+const REPORTER_DEF: AgentDef = {
+  registryName: 'ashford-news-scout',
+  model: 'openai/gpt-5-5',
+  json: true,
+  connectors: ['tavily', 'sf-guide'],
+  persona:
+    'You are a news scout for a video game. You research with your tools and reply ' +
+    'ONLY with the exact JSON asked for — no prose, no code fences.',
+};
+
+/** json_object mode requires an object at the top level, so the array rides
+ *  under "items"; extractItems still accepts a bare array defensively. */
+function extractItems(raw: string): NewsItem[] | null {
+  const asObject = extractJson<{ items?: NewsItem[] }>(raw);
+  if (Array.isArray(asObject?.items)) return asObject.items;
+  const asArray = extractJson<NewsItem[]>(raw);
+  return Array.isArray(asArray) ? asArray : null;
+}
 
 async function fetchNews(): Promise<NewsItem[]> {
   if (news && Date.now() - news.at < NEWS_TTL_MS) return news.items;
@@ -73,15 +88,14 @@ async function fetchNews(): Promise<NewsItem[]> {
     `AI/dev-tool news, a hackathon or demo that went viral, funding, and at least one lighter SF-life item ` +
     `(fog, food, Waymo sightings, a great event). Be quick: at most 2 broad searches, then write. If a ` +
     `city-data tool is available you may add one live SF fact (air quality, quakes, tides). Reply with ONLY this JSON:\n` +
-    `[{"headline":"...", "detail":"one concrete sentence with a name or number", "source":"site"}]`;
+    `{"items": [{"headline":"...", "detail":"one concrete sentence with a name or number", "source":"site"}]}`;
   try {
-    const model = await resolveModel('openai/gpt-5-5');
-    let raw = await agentText('chatter-reporter', REPORTER_PERSONA, model, ['tavily', 'sf-guide'], prompt, 240_000);
-    let items = extractJson<NewsItem[]>(raw);
+    let raw = await agentText('chatter-reporter', REPORTER_DEF, prompt, 240_000);
+    let items = extractItems(raw);
     if (!items?.length) {
-      raw = await agentText('chatter-reporter', REPORTER_PERSONA, model, ['tavily', 'sf-guide'],
-        'That was not parseable. Reply again with ONLY the JSON array, nothing else.', 120_000);
-      items = extractJson<NewsItem[]>(raw);
+      raw = await agentText('chatter-reporter', REPORTER_DEF,
+        'That was not parseable. Reply again with ONLY the JSON object, nothing else.', 120_000);
+      items = extractItems(raw);
     }
     const clean = (items ?? [])
       .filter((i) => i?.headline && i?.detail)
@@ -109,9 +123,16 @@ async function fetchNews(): Promise<NewsItem[]> {
 
 // ── the playwright: script one conversation ─────────────────────────────────
 
-const PLAYWRIGHT_PERSONA =
-  'You write short in-game dialogues between two villagers. You reply ONLY with the exact ' +
-  'JSON asked for — no prose, no code fences.';
+/** The playwright: JSON-mode, no tools, no subagents — pure script writing. */
+const PLAYWRIGHT_DEF: AgentDef = {
+  registryName: 'ashford-playwright',
+  model: 'openai/gpt-5-4-mini',
+  json: true,
+  subagents: false,
+  persona:
+    'You write short in-game dialogues between two villagers. You reply ONLY with the exact ' +
+    'JSON asked for — no prose, no code fences.',
+};
 
 async function generateScript(aId: string, bId: string, items: NewsItem[]): Promise<ScriptLine[] | null> {
   const a = getNpc(aId);
@@ -134,12 +155,11 @@ async function generateScript(aId: string, bId: string, items: NewsItem[]): Prom
     `kawaii-cheerful, an emoji like ✨☔❗ now and then. End on a fun button line.\n` +
     `Reply with ONLY this JSON: {"topic":"3-5 words","lines":[{"who":"${a.id}","text":"...","emotion":"happy|sad|shock|think|neutral"}]}`;
   try {
-    const model = await resolveModel('openai/gpt-5-4-mini');
     const key = `chatter-play-${aId}-${bId}`;
-    let raw = await agentText(key, PLAYWRIGHT_PERSONA, model, [], prompt);
+    let raw = await agentText(key, PLAYWRIGHT_DEF, prompt);
     let parsed = extractJson<{ topic?: string; lines?: ScriptLine[] }>(raw);
     if (!parsed?.lines?.length) {
-      raw = await agentText(key, PLAYWRIGHT_PERSONA, model, [],
+      raw = await agentText(key, PLAYWRIGHT_DEF,
         'Not parseable. Reply again with ONLY the JSON object, nothing else.');
       parsed = extractJson<{ topic?: string; lines?: ScriptLine[] }>(raw);
     }
@@ -259,6 +279,10 @@ async function runOne(pair: [string, string]): Promise<void> {
 
 export function startChatter(): void {
   if (process.env.CHATTER_DISABLED === '1') return;
+  // Put the backstage crew in the Agent Library alongside the villagers.
+  for (const def of [REPORTER_DEF, PLAYWRIGHT_DEF]) {
+    ensureAgent(def).catch(() => warnOnce('chatter-register', '[chatter] agent registration deferred — harness not up yet'));
+  }
   nextAt = Date.now() + 60_000; // let the village boot and the model warm up
   setInterval(() => {
     if (running || Date.now() < nextAt) return;

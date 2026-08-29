@@ -1,24 +1,32 @@
 /**
- * Dialogue broker: one TrueForge session per NPC (created lazily, kept for the
- * run — that persistence IS the character's memory), a [WORLD NOW] digest
- * injected before every player line, deltas streamed back over the WS as
- * bubble frames, and canned fallback lines so the demo never hangs.
+ * Dialogue broker: every character is a NAMED TrueForge agent (registered in
+ * the Agent Library at boot — see registerAgents) with one long-lived session
+ * as its memory. A player line becomes a turn with a [WORLD NOW] digest;
+ * deltas stream back over the WS as bubble frames; canned fallback lines keep
+ * the demo alive when the harness is unreachable.
  *
- * TrueForge contract (verified against the live 0.2.0-rc.0 server; the shapes
- * in game/src/harness.ts mirror it):
- *   POST /api/v1/sessions        {agent:{spec:{model:{name},instructions,mcp_servers?}}}
- *                                → session id at body.data.id (no metadata key!)
- *   GET  /api/v1/models          → {data:[{name}]} configured chat models
- *   GET  /api/v1/mcp-servers     → {data:[{name,auth_status:{status}}]}
- *   POST /api/v1/sessions/:id/turns?stream=true
- *                                → SSE: model.message.delta (.content and/or
- *                                  .tool_calls fragments), mcp.initialize,
- *                                  tool.response, turn.done
+ * The harness's pauses are game mechanics, exactly as the README promises:
+ *  - ask_user_question  → the NPC asks the player in a bubble; the player's
+ *    next line resumes the turn as user.tool_response.
+ *  - tool approval      → the NPC asks "shall I?"; a yes-ish reply resumes
+ *    as user.tool_approval allow, anything else denies with the reason.
+ *  - mcp.auth_required  → surfaced as a toast + log with the authorize URL.
+ *
+ * All TrueForge mechanics live in harness.ts; this file is the game side.
  */
 import type { Emotion, Npc, Quest, QuestStep } from '../../shared/protocol';
-import { CONFIG } from './config';
+import {
+  type AgentDef,
+  ensureAgent,
+  forgetSession,
+  HarnessUnavailable,
+  type PendingAction,
+  sessionFor,
+  streamTurn,
+  userMessage,
+} from './harness';
 import { POI_IDS } from './island';
-import { NPC_IDS, npcSeed, type NpcSeed } from './npcs';
+import { NPC_IDS, NPC_SEEDS, npcSeed, type NpcSeed } from './npcs';
 import { engagePlayer } from './sim';
 import {
   addEvent,
@@ -37,237 +45,36 @@ import {
   recentEventSummaries,
 } from './state';
 import { clamp, dist2d, nextId, pick, warnOnce } from './util';
+import type { TrueForgeApi } from '@truefoundry/trueforge-sdk';
 
-const BASE = CONFIG.trueforgeBase;
-const STALL_MS = 10_000;
+const STALL_MS = 12_000;
 
-class HarnessUnavailable extends Error {}
+// ── the cast as named agents ────────────────────────────────────────────────
 
-// ── model + connector discovery (60s caches, re-checked per session create) ─
+const npcAgentDef = (seed: NpcSeed): AgentDef => ({
+  registryName: `ashford-${seed.id}`,
+  persona: seed.persona,
+  model: seed.model,
+  webAccess: seed.webAccess,
+});
 
-let modelCache: { at: number; names: string[] } | null = null;
-
-async function configuredModels(): Promise<string[]> {
-  if (modelCache && Date.now() - modelCache.at < 60_000) return modelCache.names;
-  const res = await fetch(`${BASE}/api/v1/models`, { signal: AbortSignal.timeout(5_000) });
-  if (!res.ok) throw new HarnessUnavailable(`models: ${res.status}`);
-  const body = (await res.json()) as { data?: { name?: string }[] };
-  const names = (body?.data ?? []).map((m) => m.name).filter((n): n is string => !!n);
-  modelCache = { at: Date.now(), names };
-  return names;
-}
-
-/** env TRUEFORGE_MODEL wins; else the NPC's preference if configured; else the
- *  first catalog entry; an empty catalog routes straight to canned fallbacks. */
-export async function resolveModel(preferred?: string): Promise<string> {
-  if (CONFIG.trueforgeModel) return CONFIG.trueforgeModel;
-  const names = await configuredModels();
-  if (preferred && names.includes(preferred)) return preferred;
-  if (names[0]) return names[0];
-  warnOnce(
-    'trueforge-nomodel',
-    '[dialogue] TrueForge has no model configured — paste a key in Settings → Models; serving canned lines',
-  );
-  throw new HarnessUnavailable('no model configured');
-}
-
-/** Connectors a webAccess NPC gets, matched against what the harness actually
- *  has configured AND authenticated, in preference order: the search providers
- *  first, then sf-guide (our own live SF city-data MCP — weather/fog, quakes,
- *  tides, bike share, DataSF datasets). Names must match the TrueForge
- *  connector names exactly; anything not configured is silently skipped, and
- *  WEB_TOOLS_RULE in npcs.ts tells the characters how to use whatever lands. */
-const WEB_CONNECTORS = ['bright-data', 'tavily', 'exa', 'parallel-web', 'sf-guide'];
-
-let connectorCache: { at: number; names: string[] } | null = null;
-
-/** Every authenticated connector TrueForge has configured (unfiltered). */
-async function configuredConnectors(): Promise<string[]> {
-  if (connectorCache && Date.now() - connectorCache.at < 60_000) return connectorCache.names;
-  const res = await fetch(`${BASE}/api/v1/mcp-servers`, { signal: AbortSignal.timeout(5_000) });
-  if (!res.ok) throw new HarnessUnavailable(`connectors: ${res.status}`);
-  const body = (await res.json()) as { data?: { name?: string; auth_status?: { status?: string } }[] };
-  const names = (body?.data ?? [])
-    .filter((s) => s.name && ['authenticated', 'not_required'].includes(s.auth_status?.status ?? 'authenticated'))
-    .map((s) => s.name!);
-  connectorCache = { at: Date.now(), names };
-  return names;
-}
-
-// ── sessions ────────────────────────────────────────────────────────────────
-
-const sessions = new Map<string, string>();
-
-export interface SessionSpec {
-  persona: string;
-  model?: string;
-  webAccess?: boolean;
-  /** Extra MCP connector names to attach verbatim (deduped against webAccess
-   *  ones; silently dropped if TrueForge doesn't have them configured). */
-  connectors?: string[];
-}
-
-export async function sessionFor(key: string, spec: SessionSpec, signal: AbortSignal): Promise<string> {
-  const existing = sessions.get(key);
-  if (existing) return existing;
-
-  const model = await resolveModel(spec.model);
-  let connectors: string[] = [];
-  if (spec.webAccess || spec.connectors?.length) {
+/**
+ * Boot hook: save every character (and the Quest Scribe) into the TrueForge
+ * Agent Library, so the whole cast shows up as first-class agents in the
+ * harness UI. Fail-soft — a down harness just means lazy registration later.
+ */
+export async function registerAgents(): Promise<void> {
+  let ok = 0;
+  for (const def of [...NPC_SEEDS.map(npcAgentDef), SCRIBE_DEF]) {
     try {
-      const configured = await configuredConnectors();
-      if (spec.webAccess) {
-        connectors = configured
-          .filter((n) => WEB_CONNECTORS.includes(n))
-          .sort((a, b) => WEB_CONNECTORS.indexOf(a) - WEB_CONNECTORS.indexOf(b));
-      }
-      for (const want of spec.connectors ?? []) {
-        if (configured.includes(want) && !connectors.includes(want)) connectors.push(want);
-      }
-    } catch {
-      warnOnce('trueforge-mcp', '[dialogue] could not list TrueForge mcp-servers — talking without web tools');
-    }
-  }
-
-  const res = await fetch(`${BASE}/api/v1/sessions`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    signal,
-    body: JSON.stringify({
-      agent: {
-        spec: {
-          model: { name: model },
-          instructions: spec.persona,
-          ...(connectors.length ? { mcp_servers: connectors.map((name) => ({ name })) } : {}),
-        },
-      },
-    }),
-  });
-  if (!res.ok) {
-    const detail = await res.text().catch(() => '');
-    throw new HarnessUnavailable(`create session: ${res.status} ${detail}`.slice(0, 200));
-  }
-  const body = (await res.json()) as { data?: { id?: string }; id?: string };
-  const id = body?.data?.id ?? body?.id;
-  if (!id) throw new HarnessUnavailable('no session id in response');
-  sessions.set(key, id);
-  return id;
-}
-
-// ── turn streaming (SSE) ────────────────────────────────────────────────────
-
-interface ToolCallAcc {
-  id: string;
-  name: string;
-  args: string;
-  system: boolean;
-  bubbled: boolean;
-}
-
-export interface TurnCallbacks {
-  onDelta: (chunk: string) => void;
-  /** one badge per real tool call: name or "tool: query…" once args parse */
-  onTool?: (label: string) => void;
-}
-
-function toolDetail(c: ToolCallAcc): string | null {
-  if (!c.args) return null;
-  try {
-    const o = JSON.parse(c.args) as Record<string, unknown> & { arguments?: Record<string, unknown> };
-    const label = (o.tool ?? o.name ?? c.name ?? 'tool') as string;
-    const query = (o.query ?? o.arguments?.query ?? o.input) as string | undefined;
-    return String(query ? `${label}: ${query}` : label).slice(0, 60);
-  } catch {
-    return null; // partial JSON — wait for more fragments
-  }
-}
-
-export async function streamTurn(sessionId: string, content: string, cb: TurnCallbacks, signal: AbortSignal): Promise<void> {
-  const res = await fetch(`${BASE}/api/v1/sessions/${sessionId}/turns?stream=true`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', accept: 'text/event-stream' },
-    body: JSON.stringify({ input: [{ type: 'user.message', content }] }),
-    signal,
-  });
-  if (!res.ok || !res.body) throw new HarnessUnavailable(`turn: ${res.status}`);
-
-  const calls = new Map<string, ToolCallAcc>();
-  const indexToId = new Map<number, string>();
-
-  // A call whose args never parsed still deserves its one badge before text
-  // resumes (or when its response lands) — name-only is better than silence.
-  const flushPending = () => {
-    for (const c of calls.values()) {
-      if (c.bubbled || c.system) continue;
-      c.bubbled = true;
-      cb.onTool?.(toolDetail(c) ?? (c.name || 'consulting tools'));
-    }
-  };
-
-  const handleEvent = (evt: Record<string, any>): void => {
-    if (evt?.type === 'mcp.initialize') {
-      const names = (Array.isArray(evt.mcp_servers) ? evt.mcp_servers : [])
-        .map((s: { name?: string }) => s?.name)
-        .filter(Boolean);
-      if (names.length) cb.onTool?.(`connecting: ${names.join(', ')}`);
+      await ensureAgent(def);
+      ok++;
+    } catch (e) {
+      warnOnce('register-agents', `[dialogue] agent registration paused (${e instanceof Error ? e.message : e}) — will retry lazily`);
       return;
     }
-    if (evt?.type === 'tool.response') {
-      flushPending(); // call finished — deltas resume, no badge for the response itself
-      return;
-    }
-    if (evt?.type !== 'model.message.delta') return;
-
-    if (Array.isArray(evt.tool_calls)) {
-      for (const tc of evt.tool_calls) {
-        // only the FIRST fragment of a call carries id; later ones identify by index
-        let id: string | undefined = tc?.id;
-        if (id !== undefined && typeof tc?.index === 'number') indexToId.set(tc.index, id);
-        if (id === undefined && typeof tc?.index === 'number') id = indexToId.get(tc.index);
-        if (!id) continue;
-        let acc = calls.get(id);
-        if (!acc) {
-          acc = { id, name: '', args: '', system: false, bubbled: false };
-          calls.set(id, acc);
-        }
-        if (tc?.function?.name) acc.name = tc.function.name;
-        if (typeof tc?.function?.arguments === 'string') acc.args += tc.function.arguments;
-        if (tc?.tool_info?.type === 'truefoundry-system') acc.system = true;
-        if (!acc.system && !acc.bubbled) {
-          const detail = toolDetail(acc);
-          if (detail) {
-            acc.bubbled = true;
-            cb.onTool?.(detail);
-          }
-        }
-      }
-    }
-    if (typeof evt.content === 'string' && evt.content) {
-      flushPending();
-      cb.onDelta(evt.content);
-    }
-  };
-
-  const decoder = new TextDecoder();
-  let buffer = '';
-  for await (const chunk of res.body) {
-    buffer += decoder.decode(chunk as Uint8Array, { stream: true });
-    const frames = buffer.split('\n\n');
-    buffer = frames.pop() ?? '';
-    for (const frame of frames) {
-      const data = frame
-        .split('\n')
-        .find((l) => l.startsWith('data:'))
-        ?.slice(5)
-        .trim();
-      if (!data || data === '[DONE]') continue;
-      try {
-        handleEvent(JSON.parse(data));
-      } catch {
-        // an unparseable frame is not worth killing the conversation over
-      }
-    }
   }
+  console.log(`[dialogue] ${ok} agents registered in the TrueForge Agent Library (ashford-*)`);
 }
 
 // ── emotion parsing ─────────────────────────────────────────────────────────
@@ -342,6 +149,11 @@ export function getConversation(id: string): Conversation | undefined {
   return conversations.get(id);
 }
 
+/** Turns that ended paused, waiting on the player's next line to this NPC. */
+const pendingPauses = new Map<string, PendingAction[]>();
+
+const YES_RE = /^\s*(y|yes|aye|yeah|yep|ya|sure|ok|okay|do it|go ahead|please do|fine|alright|granted|allow)\b/i;
+
 /**
  * POST /api/npcs/:id/talk and the WS `talk` frame both land here. Responds
  * immediately with a conversation id; the reply streams over the WS and lands
@@ -364,12 +176,45 @@ export function talk(npcId: string, text: string, from?: string): string | null 
   return convId;
 }
 
+/** The player's line answers a paused turn: approvals get a yes/no decision,
+ *  questions get the line verbatim. One line answers every pending call. */
+function resumeInput(paused: PendingAction[], text: string): TrueForgeApi.TurnInputItem[] {
+  const approve = YES_RE.test(text);
+  return paused.map((p) =>
+    p.kind === 'approval'
+      ? {
+          type: 'user.tool_approval',
+          threadId: p.threadId,
+          toolCallId: p.toolCallId,
+          approval: approve ? { status: 'allow' } : { status: 'deny', reason: text.slice(0, 200) },
+        }
+      : { type: 'user.tool_response', threadId: p.threadId, toolCallId: p.toolCallId, content: text },
+  );
+}
+
+/** The NPC voices a pause: a clarifying question as itself, or an approval
+ *  gate as the in-world "shall I?" the README calls a game mechanic. */
+function pauseLine(p: PendingAction): string {
+  if (p.kind === 'question') {
+    const q = p.question ?? 'I need to ask you something first';
+    return p.options?.length ? `${q} (${p.options.join(' / ')})` : q;
+  }
+  return `I'd need to use ${p.toolName} for that — shall I? (yes / no)`;
+}
+
 async function runTurn(npc: Npc, seed: NpcSeed, convId: string, text: string, from?: string): Promise<void> {
   broadcast({ t: 'bubble', who: npc.id, convId, text: '…', emotion: 'think', mode: 'thinking' });
 
-  // Digest first, THEN the player.said event — the [says] line already carries
-  // this turn's message, so the log entry is for later turns and other NPCs.
-  const digest = buildWorldNow(npc, from, text);
+  // A paused turn must resume with approval/response items (never mixed with
+  // a user.message); otherwise the digest-first pattern applies as usual.
+  const paused = pendingPauses.get(npc.id);
+  let input: TrueForgeApi.TurnInputItem[];
+  if (paused?.length) {
+    pendingPauses.delete(npc.id);
+    input = resumeInput(paused, text);
+  } else {
+    input = userMessage(buildWorldNow(npc, from, text));
+  }
   addEvent('player.said', `${from ?? 'A traveller'} said to ${npc.name}: "${text.slice(0, 80)}"`, 'player');
   questsAutoTalk(npc.id);
 
@@ -383,14 +228,14 @@ async function runTurn(npc: Npc, seed: NpcSeed, convId: string, text: string, fr
   };
 
   try {
-    const sid = await sessionFor(npc.id, seed, ctrl.signal);
-    await streamTurn(
+    const sid = await sessionFor(npc.id, npcAgentDef(seed), ctrl.signal);
+    const result = await streamTurn(
       sid,
-      digest,
+      input,
       {
+        onEvent: bump, // any stream activity resets the stall watchdog
         onDelta: (chunk) => {
           acc += chunk;
-          bump();
           if (/^\s*\[[a-z]*$/i.test(acc)) return; // partial leading emotion tag — hold
           const p = parseEmotion(acc);
           const now = Date.now();
@@ -400,21 +245,53 @@ async function runTurn(npc: Npc, seed: NpcSeed, convId: string, text: string, fr
           }
         },
         onTool: (label) => {
-          bump();
           broadcast({ t: 'bubble', who: npc.id, convId, text: label, emotion: 'think', mode: 'tool' });
+        },
+        onThread: (title) => {
+          broadcast({ t: 'bubble', who: npc.id, convId, text: `sending a helper: ${title}`, emotion: 'think', mode: 'tool' });
         },
       },
       ctrl.signal,
     );
     clearTimeout(watchdog);
-    const p = parseEmotion(acc);
+
+    if (result.metrics?.totalTokens != null) {
+      console.log(
+        `[dialogue] ${npc.id} turn: ${result.metrics.totalTokens} tokens` +
+          (result.metrics.totalCostInUsd != null ? ` ($${result.metrics.totalCostInUsd.toFixed(4)})` : ''),
+      );
+    }
+
+    // MCP OAuth needed: nothing the player can answer in-world — surface it.
+    if (result.authRequired.length) {
+      for (const a of result.authRequired) {
+        console.warn(`[dialogue] MCP server "${a.name}" needs authorization: ${a.url}`);
+      }
+      addEvent('mcp.custom', `${npc.name}'s far-seeing tools need authorization (see hub logs)`, npc.id);
+      finishTurn(npc, convId, 'My far-seeing tools need a permission slip from the harness — try me again soon ✨', 'think');
+      return;
+    }
+
+    // The turn paused on the player: the gate IS the dialogue.
+    if (result.pending.length) {
+      pendingPauses.set(npc.id, result.pending);
+      const lead = parseEmotion(result.text).text.trim();
+      const ask = pauseLine(result.pending[0]);
+      finishTurn(npc, convId, lead ? `${lead} ${ask}` : ask, 'think');
+      return;
+    }
+
+    const p = parseEmotion(result.text);
     const final = p.text.trim();
     if (!final) throw new HarnessUnavailable('empty reply');
     finishTurn(npc, convId, final, p.emotion);
   } catch (e) {
     clearTimeout(watchdog);
     const why = e instanceof Error ? e.message : String(e);
-    warnOnce('trueforge-down', `[dialogue] TrueForge fallback path (${why}) — canned lines until it recovers`);
+    // A session TrueForge no longer knows (wiped DB, expired) gets recreated
+    // on the next line instead of failing forever.
+    if (/404|not.?found|no such session/i.test(why)) forgetSession(npc.id);
+    warnOnce('forge-down', `[dialogue] TrueForge fallback path (${why}) — canned lines until it recovers`);
     finishTurn(npc, convId, pick(seed.fallbacks), 'think');
   }
 }
@@ -449,9 +326,13 @@ export function validateSteps(input: unknown): QuestStep[] | null {
   return out;
 }
 
-// ── Quest Scribe ────────────────────────────────────────────────────────────
+// ── Quest Scribe (a JSON-mode agent: response_format json_object) ───────────
 
-const SCRIBE_SPEC: SessionSpec = {
+const SCRIBE_DEF: AgentDef = {
+  registryName: 'ashford-quest-scribe',
+  model: 'openai/gpt-5-5',
+  json: true,
+  subagents: false, // one headline in, one quest out — no fan-out needed
   persona:
     'You are the Quest Scribe of Ashford, a cozy kawaii village game. Given one real news ' +
     'headline, turn it into one tiny village quest. Reply with STRICT JSON only — no prose, ' +
@@ -461,7 +342,6 @@ const SCRIBE_SPEC: SessionSpec = {
     '{"kind":"goto","target":"<poi>","text":string}], "reward":{"coins": number between 5 and 20}}. ' +
     'Allowed talk targets: bran, wren, suki. Allowed goto targets: plaza, forge, market, farm, ' +
     'docks, hill, board, mailbox, pen, flowerpatch. JSON only.',
-  model: 'openai/gpt-5-5',
 };
 
 function parseScribe(raw: string, url: string): Quest | null {
@@ -509,26 +389,14 @@ function templateQuest(headline: string, url: string): Quest {
 }
 
 async function scribeTurn(sid: string, content: string, url: string): Promise<Quest | null> {
-  let acc = '';
   const ctrl = new AbortController();
-  let wd = setTimeout(() => ctrl.abort(), 12_000);
+  const wd = setTimeout(() => ctrl.abort(), 20_000);
   try {
-    await streamTurn(
-      sid,
-      content,
-      {
-        onDelta: (c) => {
-          acc += c;
-          clearTimeout(wd);
-          wd = setTimeout(() => ctrl.abort(), 12_000);
-        },
-      },
-      ctrl.signal,
-    );
+    const result = await streamTurn(sid, userMessage(content), { onDelta: () => {} }, ctrl.signal);
+    return parseScribe(result.text, url);
   } finally {
     clearTimeout(wd);
   }
-  return parseScribe(acc, url);
 }
 
 /**
@@ -537,7 +405,7 @@ async function scribeTurn(sid: string, content: string, url: string): Promise<Qu
  */
 export async function scribeQuest(headline: string, url: string): Promise<Quest | null> {
   try {
-    const sid = await sessionFor('quest-scribe', SCRIBE_SPEC, AbortSignal.timeout(8_000));
+    const sid = await sessionFor('quest-scribe', SCRIBE_DEF, AbortSignal.timeout(10_000));
     let quest = await scribeTurn(sid, `Headline: "${headline}" (${url})`, url);
     quest ??= await scribeTurn(sid, 'That was not valid JSON matching the schema. Reply again with ONLY the JSON object.', url);
     if (!quest) {

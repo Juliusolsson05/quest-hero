@@ -10,6 +10,7 @@ import {
   addEvent,
   broadcast,
   getNpc,
+  getPlayer,
   getTime,
   getWeather,
   listAnimals,
@@ -27,6 +28,8 @@ const STROLL_SPEED = 0.9; // m/s — casual shuffle while lingering at a stop
 const NPC_MIN_GAP = 1.0; // m — closer than this reads as "standing inside each other"
 const SPOT_GAP = 1.6; // m — min spacing between chosen standing spots
 const STOP_RADIUS = 2.8; // m — how widely a routine stop fans out around its POI
+const ENGAGE_MS = 12_000; // player-conversation hold; the client refreshes it while the talk UI is open
+const ENGAGE_BREAK_DIST = 9; // m — the player walking off ends the conversation hold
 
 // ── NPC runtime ─────────────────────────────────────────────────────────────
 
@@ -49,6 +52,8 @@ interface NpcRt {
   stroll: Vec3 | null;
   /** hard hold (chat choreography): no strolling, no new stops, keep facing */
   parkedUntil: number;
+  /** talking with the player: stand still, keep facing them (tracks movement) */
+  engagedUntil: number;
   /** next time the idle-life roll fires (stroll / glance / funny fidget) */
   nextIdleAt: number;
 }
@@ -200,6 +205,26 @@ function tickNpc(rt: NpcRt, now: number, dt: number, phase: TimePhase): void {
     rt.dwellUntil = 0; // phase change: pick a fresh stop right away
   }
 
+  // Talking with the player: freeze in place and keep facing them, tracking
+  // as they shuffle around. Ends when the hold expires (the client refreshes
+  // it while the talk UI is open) or the player simply walks away.
+  if (rt.engagedUntil) {
+    const p = getPlayer();
+    const d = dist2d(npc.pos.x, npc.pos.z, p.pos.x, p.pos.z);
+    if (now >= rt.engagedUntil || d > ENGAGE_BREAK_DIST) {
+      rt.engagedUntil = 0;
+      // linger a beat after the goodbye instead of spinning away instantly
+      rt.dwellUntil = Math.max(rt.dwellUntil, now + rand(2_000, 6_000));
+      rt.nextIdleAt = now + rand(4_000, 9_000);
+    } else {
+      clearWalk(rt);
+      rt.stroll = null;
+      npc.anim = 'idle';
+      if (d > 0.25) npc.rot = Math.atan2(p.pos.x - npc.pos.x, p.pos.z - npc.pos.z);
+      return;
+    }
+  }
+
   if (rt.target) {
     npc.anim = 'walk';
     const px = npc.pos.x, pz = npc.pos.z;
@@ -278,6 +303,26 @@ function tickNpc(rt: NpcRt, now: number, dt: number, phase: TimePhase): void {
   }
 }
 
+/**
+ * The player walked up to talk (E in the client, a WS talk frame, or a
+ * brokered turn): the NPC stops whatever it was doing and holds facing the
+ * player. Called repeatedly while the talk UI is open, so the hold slides
+ * forward; tickNpc releases it on timeout or when the player walks away.
+ */
+export function engagePlayer(npcId: string): Npc | undefined {
+  const rt = npcRts.find((r) => r.npc.id === npcId);
+  if (!rt) return undefined;
+  const fresh = rt.engagedUntil <= Date.now();
+  rt.engagedUntil = Date.now() + ENGAGE_MS;
+  rt.parkedUntil = 0;
+  rt.forced = null;
+  clearWalk(rt);
+  rt.stroll = null;
+  rt.npc.anim = 'idle';
+  if (fresh) setActivity(rt.npc, `chatting with ${getPlayer().name}`);
+  return rt.npc;
+}
+
 /** POST /api/npcs/:id/goto — walk there now, then resume the routine. */
 export function sendNpcTo(npcId: string, poiId: string): Npc | undefined {
   const rt = npcRts.find((r) => r.npc.id === npcId);
@@ -287,6 +332,7 @@ export function sendNpcTo(npcId: string, poiId: string): Npc | undefined {
   rt.stop = null;
   rt.stroll = null;
   rt.parkedUntil = 0;
+  rt.engagedUntil = 0;
   routeTo(rt, pickSpotNear(rt, p.pos.x, p.pos.z, 1.8));
   rt.dwellUntil = 0;
   setActivity(rt.npc, `walking to ${POI_LABELS[poiId] ?? poiId}`);
@@ -312,12 +358,14 @@ export function summonForChat(aId: string, bId: string): boolean {
   clearWalk(rb);
   rb.stroll = null;
   rb.forced = null;
+  rb.engagedUntil = 0;
   rb.parkedUntil = Date.now() + 40_000; // long enough for the walk over
   rb.dwellUntil = rb.parkedUntil;
   ra.forced = null;
   ra.stop = null;
   ra.stroll = null;
   ra.parkedUntil = 0;
+  ra.engagedUntil = 0;
   ra.dwellUntil = 0;
   routeTo(ra, chatSpotNear(rb.npc.pos));
   setActivity(ra.npc, `heading over to ${rb.npc.name}`);
@@ -334,6 +382,7 @@ export function holdFacing(aId: string, bId: string, holdMs: number): void {
     clearWalk(me);
     me.stroll = null;
     me.forced = null;
+    me.engagedUntil = 0;
     me.parkedUntil = until;
     me.dwellUntil = until;
     me.npc.anim = 'idle';
@@ -569,6 +618,7 @@ export function startSim(): void {
       forced: null,
       stroll: null,
       parkedUntil: 0,
+      engagedUntil: 0,
       nextIdleAt: 0,
     });
   }

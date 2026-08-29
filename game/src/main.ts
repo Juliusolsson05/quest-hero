@@ -91,6 +91,12 @@ const boardPos: THREE.Vector3 | null = (() => {
 let npcCount = 0;
 const quests = new Map<string, Quest>();
 
+// "Blacksmith · Bran", "Venture Capitalist · Chad" — the profession leads
+// wherever a citizen's name is shown, so who you're dealing with reads at
+// a glance in bubbles, the talk bar, prompts, and the city pulse.
+const roleTitle = (role: string): string => role.replace(/(^|\s)\S/g, (c) => c.toUpperCase());
+const npcLabel = (n: { name: string; role: string }): string => `${roleTitle(n.role)} · ${n.name}`;
+
 function pushQuests(): void {
   const order = { offered: 0, active: 1, done: 2 };
   ui.setQuests([...quests.values()].sort((a, b) => order[a.state] - order[b.state]));
@@ -124,9 +130,9 @@ net.on((f: ServerFrame) => {
     case 'pose': entities.applyPose(f); break;
     case 'bubble': {
       const npc = entities.npc(f.who)?.data;
-      bubbles.push(f.who, npc?.name ?? f.who, npc?.bubbleTint ?? '#fffdf6', f.mode, f.text, f.emotion);
+      bubbles.push(f.who, npc ? npcLabel(npc) : f.who, npc?.bubbleTint ?? '#fffdf6', f.mode, f.text, f.emotion);
       if (f.mode !== 'thinking' && f.mode !== 'tool') {
-        feed.addTalk(npc?.name ?? f.who, npc?.bubbleTint ?? '#fffdf6', f.text);
+        feed.addTalk(npc ? npcLabel(npc) : f.who, npc?.bubbleTint ?? '#fffdf6', f.text);
       }
       break;
     }
@@ -221,9 +227,20 @@ addEventListener('keydown', (e) => {
   if (e.code !== 'KeyE') return;
   if (carts.nearCart()) { carts.board(); phone.close(); return; }
   const npc = entities.nearestNpc(player.pos, 3.4);
-  if (npc) { ui.openTalk(npc.id, `${npc.name} · ${npc.role}`); return; }
+  if (npc) {
+    ui.openTalk(npc.id, npcLabel(npc));
+    net.send({ t: 'interact', targetId: npc.id }); // hub: stop + face the player
+    return;
+  }
   if (boardPos && boardPos.distanceTo(player.pos) < 3.2) ui.openQuests();
 });
+
+// Keep the conversation hold alive while the talk bar stays open — the hub's
+// hold is ~12s, so a 5s heartbeat means the NPC never wanders off mid-chat.
+setInterval(() => {
+  const who = ui.talking;
+  if (who) net.send({ t: 'interact', targetId: who });
+}, 5000);
 
 // Pose uplink at 10Hz.
 setInterval(() => {
@@ -277,7 +294,7 @@ renderer.setAnimationLoop(() => {
   if (document.body.dataset.typing !== '1') {
     const npc = entities.nearestNpc(player.pos, 3.4);
     if (carts.nearCart()) ui.setPrompt(`<kbd>E</kbd> hop into the ${carts.cartLabel} 🚕`);
-    else if (npc) ui.setPrompt(`<kbd>E</kbd> talk to ${npc.name} 💬`);
+    else if (npc) ui.setPrompt(`<kbd>E</kbd> talk to ${roleTitle(npc.role)} ${npc.name} 💬`);
     else if (boardPos && boardPos.distanceTo(player.pos) < 3.2) ui.setPrompt(`<kbd>E</kbd> read the notice board 📋`);
     else ui.setPrompt(null);
   } else ui.setPrompt(null);

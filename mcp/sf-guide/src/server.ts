@@ -48,8 +48,13 @@ function buildServer(): McpServer {
     {
       title: 'List San Francisco data sources',
       description:
-        'Every San Francisco dataset and live feed available, with the id to pass to other tools. ' +
-        'Call this first when you are not certain a dataset exists.',
+        'STEP 1 of any dataset lookup. Lists every San Francisco dataset and live feed this ' +
+        'server can reach, as [{id, title, kind, about}]. The `id` is exactly what you pass ' +
+        'as `source_id` to sf_describe_dataset and sf_query_dataset. Covers ~30 sources: ' +
+        'film locations, street trees, public art, food trucks, restaurant inspections, ' +
+        'Muni stops, parks, public toilets, 311 complaints, police incidents, and more. ' +
+        'No inputs. Call this whenever you are not 100% certain a dataset exists or what ' +
+        'its id is — never guess an id.',
       inputSchema: {},
     },
     async () =>
@@ -61,8 +66,10 @@ function buildServer(): McpServer {
     {
       title: 'Describe a dataset',
       description:
-        'Column names for a DataSF dataset. Call this before sf_query_dataset when writing a filter, ' +
-        'so the filter uses real field names rather than guessed ones.',
+        'STEP 2 of a dataset lookup. Returns {source, columns: [...]} — the REAL column ' +
+        'names of one DataSF dataset. Always call this before writing a `where` filter for ' +
+        'sf_query_dataset: guessed field names cause query errors. Input: `source_id`, an ' +
+        'id from sf_list_sources (e.g. "film_locations", "street_trees", "food_trucks").',
       inputSchema: { source_id: z.string().describe('id from sf_list_sources, e.g. "film_locations"') },
     },
     async ({ source_id }) => {
@@ -75,15 +82,19 @@ function buildServer(): McpServer {
     {
       title: 'Query a San Francisco dataset',
       description:
-        'Query any DataSF dataset. `where` accepts SoQL, so you can filter precisely — for example ' +
-        `qSpecies like '%Ficus%' on street_trees, or title like '%Vertigo%' on film_locations. ` +
-        'Use sf_describe_dataset first to learn the column names.',
+        'STEP 3: fetch rows from one DataSF dataset. Returns {source, rows: [...]} — rows ' +
+        'are trimmed (no geometry blobs) and capped at 50; default limit is 10. Workflow: ' +
+        'sf_list_sources → sf_describe_dataset → this. `where` accepts SoQL, so you can ' +
+        "filter precisely — e.g. qSpecies like '%Ficus%' on street_trees, " +
+        "title like '%Vertigo%' on film_locations, neighborhoods='Mission' where that " +
+        'column exists. If the query errors, re-check the column names with ' +
+        'sf_describe_dataset instead of retrying the same filter.',
       inputSchema: {
         source_id: z.string().describe('id from sf_list_sources'),
-        where: z.string().optional().describe("SoQL filter, e.g. \"neighborhood='Mission'\""),
-        select: z.string().optional().describe('comma-separated columns to return'),
-        order: z.string().optional().describe('column to sort by, optionally with DESC'),
-        limit: z.number().optional().describe('rows to return, 1-50, default 10'),
+        where: z.string().optional().describe("SoQL filter using REAL column names from sf_describe_dataset, e.g. \"qspecies like '%Ficus%'\""),
+        select: z.string().optional().describe('comma-separated columns to return (default: all trimmed columns)'),
+        order: z.string().optional().describe('column to sort by, optionally with DESC, e.g. "filingdate DESC"'),
+        limit: z.number().optional().describe('rows to return, 1-50 (default 10)'),
       },
     },
     async ({ source_id, where, select, order, limit }) => {
@@ -99,8 +110,11 @@ function buildServer(): McpServer {
     {
       title: 'Current San Francisco conditions',
       description:
-        'Temperature, wind, air quality, and visibility with a plain-language fog reading. ' +
-        'Use this for "is it foggy", "what should I wear", or anything about right now.',
+        'San Francisco RIGHT NOW, in one call: temperature_c, feels_like_c, wind_kmh, ' +
+        'cloud_cover_pct, visibility_m with a plain-language `fog` reading ' +
+        '("thick fog" / "hazy / light fog" / "clear"), plus air quality (us_aqi, pm2_5). ' +
+        'No inputs. This is THE tool for "is it foggy", "what should I wear", "how is ' +
+        'the air today", or any question about current SF weather.',
       inputSchema: {},
     },
     async () => { try { return ok(await liveConditions()); } catch (e) { return fail(e); } },
@@ -110,7 +124,11 @@ function buildServer(): McpServer {
     'sf_earthquakes',
     {
       title: 'Recent Bay Area earthquakes',
-      description: 'Every earthquake within 150km of San Francisco recently, with magnitude and time.',
+      description:
+        'The 10 most recent earthquakes within 150 km of San Francisco (live from USGS), ' +
+        'newest first, as [{magnitude, place, when}]. No inputs. Use for any "was there ' +
+        'an earthquake" / "is the ground shaking" question. An empty list means none ' +
+        'recently — say so, do not invent one.',
       inputSchema: {},
     },
     async () => { try { return ok(await earthquakes()); } catch (e) { return fail(e); } },
@@ -121,8 +139,10 @@ function buildServer(): McpServer {
     {
       title: 'Tides, sunrise and sunset',
       description:
-        'High and low tides under the Golden Gate today, plus sunrise and sunset. ' +
-        'Use for photography timing and anything at the waterfront.',
+        "Today's high/low tides under the Golden Gate (NOAA Fort Point, as " +
+        '{tides_today: [{time, feet, kind}]}) plus sunrise and sunset times. No inputs. ' +
+        'Use for photography timing ("when is golden hour"), waterfront plans, and ' +
+        'anything tide- or daylight-related.',
       inputSchema: {},
     },
     async () => { try { return ok(await tidesAndSun()); } catch (e) { return fail(e); } },
@@ -132,7 +152,10 @@ function buildServer(): McpServer {
     'sf_bike_share',
     {
       title: 'Bay Wheels bike availability',
-      description: 'Live bike and dock counts across the Bay Wheels network.',
+      description:
+        'Live Bay Wheels network totals right now: {stations, bikes_available, ' +
+        'docks_available}. No inputs. Use for "can I grab a bike" — note it is a ' +
+        'city-wide total, not per-station.',
       inputSchema: {},
     },
     async () => { try { return ok(await bikeShare()); } catch (e) { return fail(e); } },
@@ -143,12 +166,15 @@ function buildServer(): McpServer {
     {
       title: 'Landmarks near a point',
       description:
-        'Anything with a Wikipedia article near a coordinate, nearest first. ' +
-        'Defaults to downtown San Francisco. Good for building a walking tour.',
+        'Everything with a Wikipedia article near a coordinate, nearest first, as ' +
+        '[{title, metres_away}]. All inputs optional: defaults to downtown San Francisco ' +
+        '(37.7749, -122.4194) with a 1500 m radius (max 10000). Use to build a walking ' +
+        'tour or answer "what is worth seeing near X" — pass lat/lon only when the ' +
+        'player names a specific place you know coordinates for.',
       inputSchema: {
-        lat: z.number().optional().describe('latitude, default 37.7749'),
-        lon: z.number().optional().describe('longitude, default -122.4194'),
-        radius_m: z.number().optional().describe('search radius in metres, max 10000'),
+        lat: z.number().optional().describe('latitude (default 37.7749, downtown SF)'),
+        lon: z.number().optional().describe('longitude (default -122.4194, downtown SF)'),
+        radius_m: z.number().optional().describe('search radius in metres, default 1500, max 10000'),
       },
     },
     async ({ lat, lon, radius_m }) => {

@@ -19,6 +19,7 @@ import type { Emotion, Npc, Quest, QuestStep } from '../../shared/protocol';
 import { CONFIG } from './config';
 import { POI_IDS } from './island';
 import { NPC_IDS, npcSeed, type NpcSeed } from './npcs';
+import { engagePlayer } from './sim';
 import {
   addEvent,
   addQuest,
@@ -70,9 +71,13 @@ export async function resolveModel(preferred?: string): Promise<string> {
   throw new HarnessUnavailable('no model configured');
 }
 
-/** Web connectors in the shipped catalog, matched against what the harness has
- *  configured AND authenticated, in catalog preference order. */
-const WEB_CONNECTORS = ['bright-data', 'tavily', 'exa', 'parallel-web'];
+/** Connectors a webAccess NPC gets, matched against what the harness actually
+ *  has configured AND authenticated, in preference order: the search providers
+ *  first, then sf-guide (our own live SF city-data MCP — weather/fog, quakes,
+ *  tides, bike share, DataSF datasets). Names must match the TrueForge
+ *  connector names exactly; anything not configured is silently skipped, and
+ *  WEB_TOOLS_RULE in npcs.ts tells the characters how to use whatever lands. */
+const WEB_CONNECTORS = ['bright-data', 'tavily', 'exa', 'parallel-web', 'sf-guide'];
 
 let connectorCache: { at: number; names: string[] } | null = null;
 
@@ -347,6 +352,8 @@ export function talk(npcId: string, text: string, from?: string): string | null 
   const seed = npcSeed(npcId);
   if (!npc || !seed || typeof text !== 'string' || !text.trim()) return null;
 
+  engagePlayer(npc.id); // stop and face the player for the whole exchange
+
   const convId = nextId('conv');
   conversations.set(convId, { done: false, text: '' });
   if (conversations.size > 200) {
@@ -415,6 +422,7 @@ async function runTurn(npc: Npc, seed: NpcSeed, convId: string, text: string, fr
 function finishTurn(npc: Npc, convId: string, text: string, emotion: Emotion): void {
   conversations.set(convId, { done: true, text });
   npcCommitSaid(npc.id, convId, text, emotion);
+  engagePlayer(npc.id); // hold still while the player reads the reply
 }
 
 // ── quest step validation (shared with POST /api/quests) ────────────────────

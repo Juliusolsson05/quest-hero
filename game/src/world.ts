@@ -481,6 +481,40 @@ function buildProps(props: Prop[], view: IslandView) {
         B(0.22, 5.9, 0, 0.38, 0.22, 0.05, C.coral);        // flag
         break;
       }
+      case 'irs': {
+        // The IRS field office: the one deliberately boring building in a
+        // kawaii city. Beige brutalism, grim window rows, and fat rooftop
+        // letters so you can read your doom from across town.
+        B(0, 1.6, 0, 4.6, 3.2, 3.4, C.concrete);           // the slab
+        B(0, 3.32, 0, 4.9, 0.26, 3.7, C.concreteD);        // parapet
+        for (const row of [1.15, 2.35])                    // two grim rows
+          for (let i = -2; i <= 2; i++)
+            B(i * 0.85, row, 1.72, 0.5, 0.58, 0.06, C.glass);
+        B(-0.34, 0.85, 1.72, 0.6, 1.7, 0.08, C.dark);      // double door
+        B(0.34, 0.85, 1.72, 0.6, 1.7, 0.08, C.dark);
+        B(0.5, 0.9, 1.77, 0.09, 0.09, 0.03, C.gold);       // door handles
+        B(-0.5, 0.9, 1.77, 0.09, 0.09, 0.03, C.gold);
+        B(0, 2.0, 1.74, 1.5, 0.28, 0.05, C.concreteD);     // lintel
+        B(0, 2.72, 1.73, 0.55, 0.55, 0.05, C.gold);        // the seal
+        B(0, 0.09, 2.15, 2.0, 0.18, 0.9, C.concreteD);     // front step
+        B(2.35, 2.1, 1.2, 0.09, 4.2, 0.09, C.concreteD);   // flag pole
+        B(2.6, 3.9, 1.2, 0.45, 0.28, 0.05, C.coral);       // flag
+        // ── FAT ROOF LETTERS ──  each ~1×1.6, standing on the parapet
+        const TH = 0.34, DEEP = 0.34, BASE = 3.45, LZ = 0.2;
+        const seg = (ox: number, lx: number, ly: number, w: number, h: number) =>
+          B(ox + lx, BASE + ly, LZ, w, h, DEEP, C.dark);
+        // I
+        seg(-1.35, 0, 1.45, 1.0, 0.3); seg(-1.35, 0, 0.8, TH, 1.0); seg(-1.35, 0, 0.15, 1.0, 0.3);
+        // R
+        seg(0, -0.33, 0.8, TH, 1.6); seg(0, 0.08, 1.45, 0.85, 0.3);
+        seg(0, 0.33, 1.1, TH, 0.55); seg(0, 0.08, 0.82, 0.85, 0.28);
+        seg(0, 0.3, 0.34, TH, 0.68);
+        // S
+        seg(1.35, 0, 1.45, 1.0, 0.3); seg(1.35, -0.33, 1.12, TH, 0.42);
+        seg(1.35, 0, 0.8, 1.0, 0.3); seg(1.35, 0.33, 0.48, TH, 0.42);
+        seg(1.35, 0, 0.15, 1.0, 0.3);
+        break;
+      }
       case 'transamerica': {
         for (let i = 0; i < 8; i++) {                       // stepped pyramid
           const w = 2.8 - i * 0.33;

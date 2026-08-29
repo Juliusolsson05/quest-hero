@@ -17,6 +17,9 @@ export class Player {
   anim: AnimName = 'idle';
 
   private island: IslandView | null = null;
+  /** When set, movement lives in this rectangular room (the boss arena)
+   *  instead of the island grid — a flat floor and four hard walls. */
+  private arena: { minX: number; maxX: number; minZ: number; maxZ: number; y: number } | null = null;
   private readonly keys = new Set<string>();
   private camYaw = Math.PI * 0.85;
   private camPitch = 0.52;
@@ -62,10 +65,18 @@ export class Player {
   /** Drop the hero somewhere else on the island (cart rides, cutscenes). */
   teleport(to: THREE.Vector3): void {
     this.pos.set(to.x, to.y, to.z);
-    if (this.island) {
+    if (this.arena) {
+      this.groundY = this.arena.y;
+      this.pos.y = this.groundY;
+    } else if (this.island) {
       this.groundY = this.island.heightAt(to.x, to.z);
       this.pos.y = this.groundY;
     }
+  }
+
+  /** Enter (or with null, leave) an off-grid room. */
+  setArena(a: Player['arena']): void {
+    this.arena = a;
   }
 
   update(dt: number): void {
@@ -80,13 +91,17 @@ export class Player {
         .normalize()
         .applyAxisAngle(new THREE.Vector3(0, 1, 0), this.camYaw);
       // Axis-separated moves so we slide along blocked tiles and walls instead
-      // of sticking; canMove also collides with building footprints.
+      // of sticking; canMove also collides with building footprints. In the
+      // arena the room's rectangle is the whole law.
+      const can = (tx: number, tz: number): boolean => this.arena
+        ? tx >= this.arena.minX && tx <= this.arena.maxX && tz >= this.arena.minZ && tz <= this.arena.maxZ
+        : this.island!.canMove(this.pos.x, this.pos.z, tx, tz);
       const nx = this.pos.x + dir.x * speed * dt;
-      if (this.island.canMove(this.pos.x, this.pos.z, nx, this.pos.z)) this.pos.x = nx;
+      if (can(nx, this.pos.z)) this.pos.x = nx;
       const nz = this.pos.z + dir.z * speed * dt;
-      if (this.island.canMove(this.pos.x, this.pos.z, this.pos.x, nz)) this.pos.z = nz;
+      if (can(this.pos.x, nz)) this.pos.z = nz;
 
-      this.groundY = this.island.heightAt(this.pos.x, this.pos.z);
+      this.groundY = this.arena ? this.arena.y : this.island.heightAt(this.pos.x, this.pos.z);
       const target = Math.atan2(dir.x, dir.z);
       // Shortest-path angle lerp so the hero turns, not spins.
       let d = target - this.rot;
@@ -114,13 +129,15 @@ export class Player {
       Math.cos(this.camYaw) * Math.cos(this.camPitch),
     ).multiplyScalar(this.camDist);
     const wanted = target.clone().add(off);
-    if (this.island) {
+    if (this.island && !this.arena) {
       // Pull in when a building would occlude the hero…
       const t = this.island.cameraClearT(target, wanted);
       if (t < 1) wanted.lerpVectors(target, wanted, Math.max(0.14, t));
       // …and keep the camera above the terrain skin.
       const ch = this.island.heightAt(wanted.x, wanted.z);
       wanted.y = Math.max(wanted.y, ch + 0.6);
+    } else if (this.arena) {
+      wanted.y = Math.max(wanted.y, this.arena.y + 0.5); // never under the floor
     }
     this.camera.position.lerp(wanted, Math.min(1, dt * 10));
     this.camera.lookAt(target);

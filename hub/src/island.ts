@@ -190,6 +190,7 @@ const POI_DEFS: { id: string; label: string; x: number; z: number }[] = [
   { id: 'flowerpatch', label: 'the flower patch', x: 23, z: 50.6 },
   { id: 'sfrow', label: 'downtown', x: 62, z: 42 },
   { id: 'gate', label: 'the Golden Gate', x: 42, z: 25.4 },
+  { id: 'irs', label: 'the IRS headquarters', x: 20.6, z: 52 },
 ];
 
 // ── props ───────────────────────────────────────────────────────────────────
@@ -221,6 +222,7 @@ function buildProps(): PropDef[] {
   P.push({ kind: 'flowerpatch', x: 23, z: 50.6 });
   P.push({ kind: 'boat', x: 82.5, z: 33.6, rot: 0.5 });
   P.push({ kind: 'boat', x: 87.5, z: 52.6, rot: -0.7 });
+  P.push({ kind: 'irs', x: 16.5, z: 52, rot: -PI / 2 }); // west outskirts, on solid ground, door facing town
   P.push({ kind: 'rock', x: 40.8, z: 25.4, scale: 0.8 });
   P.push({ kind: 'rock', x: 12.4, z: 60.2, scale: 1.1 });
 
@@ -362,6 +364,7 @@ const PROP_RADII: Partial<Record<PropKind, number>> = {
   coit: 1.3,
   sutro: 1.6,
   sfhouse: 1.2,
+  irs: 4.2,
   shop: 1.3,
   tower: 1.7,
   ferry: 3.0,

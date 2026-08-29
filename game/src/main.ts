@@ -17,6 +17,7 @@ import { initProps3d } from './props3d';
 import { CartService } from './taxi';
 import { CartlyPhone } from './cartly';
 import { CityFeed } from './feed';
+import { IrsArena, IRS_ARENA } from './arena';
 import { Minimap } from './minimap';
 import { Multiplayer } from './mp';
 
@@ -203,6 +204,41 @@ carts.onRideEnd = (dest) => {
   ui.toast(`dropped at ${dest} — 5 stars for the driver? ⭐`, '🚕');
 };
 
+// ── the IRS field office: knock, and meet the taxcollector ─────────────────
+const irsArena = new IrsArena();
+scene.add(irsArena.group);
+const irsDoor = (() => {
+  const p = generatedIsland.pois.find((q) => q.id === 'irs')?.pos ?? { x: 15.4, y: 2, z: 52 };
+  return new THREE.Vector3(p.x, p.y, p.z);
+})();
+let irsKnocked = false;
+let inArena = false;
+const nearIrsDoor = () => irsDoor.distanceTo(player.pos) < 2.6;
+
+// A soft black blink for stepping between worlds.
+const veil = document.createElement('div');
+veil.style.cssText =
+  'position:fixed;inset:0;background:#0b0b12;opacity:0;pointer-events:none;transition:opacity .28s;z-index:40';
+document.body.append(veil);
+const fadeThrough = (mid: () => void) => {
+  veil.style.opacity = '1';
+  setTimeout(() => { mid(); veil.style.opacity = '0'; }, 300);
+};
+
+const enterIrs = () => fadeThrough(() => {
+  inArena = true;
+  player.setArena(IRS_ARENA.bounds);
+  player.teleport(new THREE.Vector3(IRS_ARENA.entrance.x, IRS_ARENA.floorY, IRS_ARENA.entrance.z));
+  ui.toast('the taxcollector looks up from his clipboard', '🧾');
+});
+const leaveIrs = () => fadeThrough(() => {
+  inArena = false;
+  irsKnocked = false;
+  player.setArena(null);
+  player.teleport(new THREE.Vector3(irsDoor.x + 0.8, irsDoor.y, irsDoor.z));
+  ui.toast('you step back into the sunlight. unaudited. for now', '🌤️');
+});
+
 function nearestPoiLabel(): string {
   let best = 'the village';
   let bestD = Infinity;
@@ -219,6 +255,17 @@ addEventListener('keydown', (e) => {
   if (e.code === 'KeyP') { phone.setFrom(nearestPoiLabel()); phone.toggle(); return; }
   if (e.code === 'KeyL') { feed.toggle(); return; }
   if (e.code !== 'KeyE') return;
+  if (inArena) {
+    if (irsArena.nearExit(player.pos)) leaveIrs();
+    return;
+  }
+  if (nearIrsDoor()) {
+    if (!irsKnocked) {
+      irsKnocked = true;
+      ui.toast('a voice from inside: "COME IN. BRING RECEIPTS."', '🧾');
+    } else enterIrs();
+    return;
+  }
   if (carts.nearCart()) { carts.board(); phone.close(); return; }
   const npc = entities.nearestNpc(player.pos, 3.4);
   if (npc) { ui.openTalk(npc.id, `${npc.name} · ${npc.role}`); return; }
@@ -273,10 +320,16 @@ renderer.setAnimationLoop(() => {
     );
   }
 
+  irsArena.update(dt, player.pos);
+  if (irsKnocked && !nearIrsDoor()) irsKnocked = false; // walked away; knock again
+
   // Interaction prompt.
   if (document.body.dataset.typing !== '1') {
     const npc = entities.nearestNpc(player.pos, 3.4);
-    if (carts.nearCart()) ui.setPrompt(`<kbd>E</kbd> hop into the ${carts.cartLabel} 🚕`);
+    if (inArena) ui.setPrompt(irsArena.nearExit(player.pos) ? `<kbd>E</kbd> leave before the audit 🚪` : null);
+    else if (nearIrsDoor())
+      ui.setPrompt(irsKnocked ? `<kbd>E</kbd> meet the taxcollector 🧾` : `<kbd>E</kbd> knock on the IRS door 🚪`);
+    else if (carts.nearCart()) ui.setPrompt(`<kbd>E</kbd> hop into the ${carts.cartLabel} 🚕`);
     else if (npc) ui.setPrompt(`<kbd>E</kbd> talk to ${npc.name} 💬`);
     else if (boardPos && boardPos.distanceTo(player.pos) < 3.2) ui.setPrompt(`<kbd>E</kbd> read the notice board 📋`);
     else ui.setPrompt(null);
@@ -289,3 +342,7 @@ renderer.setAnimationLoop(() => {
 
   composer.render();
 });
+
+// TEMP debug hook — removed after verification
+(window as any).__player = player;
+(window as any).__irs = { enterIrs, leaveIrs, arena: irsArena };

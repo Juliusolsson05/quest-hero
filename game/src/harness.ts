@@ -13,9 +13,34 @@ import type { NpcDef } from './npc';
  * would give us a goldfish that reintroduces itself every time you walk up.
  */
 
-const BASE = import.meta.env.VITE_TRUEFORGE_URL ?? 'http://localhost:8790';
+// Same-origin by default: vite.config.ts proxies /api/v1 to the harness,
+// because TrueForge sends no CORS headers and a direct cross-origin
+// fetch from the browser fails opaquely.
+const BASE = import.meta.env.VITE_TRUEFORGE_URL ?? '';
 
 const sessions = new Map<string, string>();
+
+/** Cached so we resolve the model once per page load, not once per NPC. */
+let modelPromise: Promise<string> | null = null;
+
+/**
+ * AgentSpec requires a model, and hardcoding a catalog id ("openai/gpt-5.2")
+ * guesses at something the harness already knows. Ask it what is configured
+ * and take the first — the game then works with whichever provider the user
+ * set up, and says something useful when they have set up none.
+ */
+async function resolveModel(): Promise<string> {
+  const res = await fetch(`${BASE}/api/v1/models`);
+  if (!res.ok) throw new HarnessUnavailable(`models: ${res.status}`);
+  const models: { name?: string }[] = (await res.json())?.data ?? [];
+  const name = models[0]?.name;
+  if (!name) {
+    throw new HarnessUnavailable(
+      'no model configured in TrueForge — add a provider at http://localhost:8790 (Settings -> Models)',
+    );
+  }
+  return name;
+}
 
 export class HarnessUnavailable extends Error {}
 
@@ -23,11 +48,14 @@ async function sessionFor(npc: NpcDef): Promise<string> {
   const existing = sessions.get(npc.id);
   if (existing) return existing;
 
+  modelPromise ??= resolveModel();
+  const model = await modelPromise;
+
   const res = await fetch(`${BASE}/api/v1/sessions`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
-      agent: { spec: { instructions: npc.persona } },
+      agent: { spec: { model: { name: model }, instructions: npc.persona } },
       metadata: { npc: npc.id, name: npc.name },
     }),
   });

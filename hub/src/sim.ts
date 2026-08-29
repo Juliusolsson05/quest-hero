@@ -28,6 +28,16 @@ const NPC_MIN_GAP = 1.0; // m — closer than this reads as "standing inside eac
 const SPOT_GAP = 1.6; // m — min spacing between chosen standing spots
 const STOP_RADIUS = 2.8; // m — how widely a routine stop fans out around its POI
 
+// The Cartly cab parks along (24, 28)→(24, 31) (client-side theatre, see
+// game/src/taxi.ts). Standing spots keep out of this capsule so the pickup
+// reads clean on camera; NPCs may still walk through it.
+const PICKUP_LANE = { x: 24, z0: 28, z1: 31, r: 2.5 };
+
+function inPickupLane(x: number, z: number): boolean {
+  const z2 = Math.max(PICKUP_LANE.z0, Math.min(PICKUP_LANE.z1, z));
+  return dist2d(x, z, PICKUP_LANE.x, z2) < PICKUP_LANE.r;
+}
+
 // ── NPC runtime ─────────────────────────────────────────────────────────────
 
 interface NpcRt {
@@ -72,7 +82,10 @@ function pickSpotNear(rt: NpcRt, x: number, z: number, radius: number): Vec3 {
     const c = randomWalkableNear(x, z, radius);
     let nearest = Infinity;
     for (const s of others) nearest = Math.min(nearest, dist2d(c.x, c.z, s.x, s.z));
-    if (nearest >= SPOT_GAP) return c;
+    // Lane spots never win over any clean sample, but stay pickable as the
+    // last resort so a POI inside the lane can't strand its routine.
+    if (inPickupLane(c.x, c.z)) nearest -= 100;
+    else if (nearest >= SPOT_GAP) return c;
     if (nearest > bestScore) {
       bestScore = nearest;
       best = c;

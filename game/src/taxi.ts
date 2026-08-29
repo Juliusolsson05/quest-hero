@@ -105,7 +105,12 @@ export class CartService {
 
   private leave(): void {
     this.phase = 'leaving';
-    this.route = [...APPROACH].reverse().map(([x, z]) => new THREE.Vector3(x, 0, z));
+    const here = this.mesh?.position.z ?? 0;
+    // Exit south over the bridge, skipping waypoints behind us — no U-turns
+    // back through the village with an empty cab.
+    this.route = [...APPROACH].reverse()
+      .filter(([, z]) => z > here - 0.5)
+      .map(([x, z]) => new THREE.Vector3(x, 0, z));
   }
 
   private groundY(x: number, z: number): number {

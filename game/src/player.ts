@@ -52,7 +52,10 @@ export class Player {
     addEventListener('pointermove', (e) => {
       if (!this.dragging) return;
       this.camYaw -= e.movementX * 0.0055;
-      this.camPitch = THREE.MathUtils.clamp(this.camPitch + e.movementY * 0.004, 0.12, 1.25);
+      // On the island the camera never dips near-level (terrain would fill
+      // the view); in the arena it must — you cannot aim an SMG at a distant
+      // boss with a crosshair that is always pointed at the floor.
+      this.camPitch = THREE.MathUtils.clamp(this.camPitch + e.movementY * 0.004, this.arena ? -0.08 : 0.12, 1.25);
     });
     addEventListener('wheel', (e) => {
       this.camDist = THREE.MathUtils.clamp(this.camDist + Math.sign(e.deltaY) * 0.8, 3.5, 18);
@@ -156,10 +159,20 @@ export class Player {
       wanted.y = Math.max(wanted.y, ch + 0.6);
     } else if (this.arena) {
       // The room is windowless on purpose; the camera never leaves it. Clamp
-      // the spring arm inside the walls and under the ceiling.
-      wanted.x = THREE.MathUtils.clamp(wanted.x, this.arena.minX, this.arena.maxX);
-      wanted.z = THREE.MathUtils.clamp(wanted.z, this.arena.minZ, this.arena.maxZ);
-      wanted.y = THREE.MathUtils.clamp(wanted.y, this.arena.y + 0.5, this.arena.y + 7.2);
+      // the spring arm inside the walls and under the ceiling — and when a
+      // wall compresses the arm, drop the camera proportionally so the LOOK
+      // ANGLE survives the pinch. Otherwise backing toward a wall tips the
+      // camera downward and the crosshair dives into the floor at range.
+      const wx = THREE.MathUtils.clamp(wanted.x, this.arena.minX, this.arena.maxX);
+      const wz = THREE.MathUtils.clamp(wanted.z, this.arena.minZ, this.arena.maxZ);
+      if (wx !== wanted.x || wz !== wanted.z) {
+        const dFull = Math.hypot(wanted.x - target.x, wanted.z - target.z);
+        const dPinch = Math.hypot(wx - target.x, wz - target.z);
+        wanted.y = target.y + (wanted.y - target.y) * (dPinch / Math.max(0.001, dFull));
+      }
+      wanted.x = wx;
+      wanted.z = wz;
+      wanted.y = THREE.MathUtils.clamp(wanted.y, this.arena.y + 0.4, this.arena.y + 7.2);
     }
     if (this.camSnap) {
       this.camera.position.copy(wanted);

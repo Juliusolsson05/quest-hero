@@ -208,6 +208,7 @@ carts.onRideEnd = (dest) => {
 // ── the IRS field office: knock, and meet the taxcollector ─────────────────
 const irsArena = new IrsArena();
 scene.add(irsArena.group);
+irsArena.group.visible = false; // only rendered while you are inside
 const irsDoor = (() => {
   const p = generatedIsland.pois.find((q) => q.id === 'irs')?.pos ?? { x: 20.6, y: 2, z: 52 };
   return new THREE.Vector3(p.x, p.y, p.z);
@@ -230,6 +231,7 @@ const fight = new BossFight(scene, irsArena, player, {
   onAudited: () => fadeThrough(() => {
     fight.reset();
     inArena = false;
+    irsArena.group.visible = false;
     irsKnocked = false;
     player.setArena(null);
     player.teleport(new THREE.Vector3(irsDoor.x + 0.8, irsDoor.y, irsDoor.z));
@@ -240,6 +242,7 @@ const fight = new BossFight(scene, irsArena, player, {
 
 const enterIrs = () => fadeThrough(() => {
   inArena = true;
+  irsArena.group.visible = true;
   player.setArena(IRS_ARENA.bounds);
   player.teleport(new THREE.Vector3(IRS_ARENA.entrance.x, IRS_ARENA.floorY, IRS_ARENA.entrance.z));
   player.setYaw(0); // walk in facing the taxcollector, not the door you came through
@@ -248,6 +251,7 @@ const enterIrs = () => fadeThrough(() => {
 const leaveIrs = () => fadeThrough(() => {
   fight.reset();
   inArena = false;
+  irsArena.group.visible = false;
   irsKnocked = false;
   player.setArena(null);
   player.teleport(new THREE.Vector3(irsDoor.x + 0.8, irsDoor.y, irsDoor.z));
@@ -309,9 +313,11 @@ void loadManifest();
 
 const playerAnchor = new THREE.Vector3();
 const clock = new THREE.Clock();
+let mmAcc = 0;
+const sizeProbe = new THREE.Vector2();
 renderer.setAnimationLoop(() => {
   // Some hosts (emulated viewports, panes) never fire `resize` — poll instead.
-  const size = renderer.getSize(new THREE.Vector2());
+  const size = renderer.getSize(sizeProbe);
   if (size.x !== innerWidth || size.y !== innerHeight) {
     player.camera.aspect = innerWidth / innerHeight;
     player.camera.updateProjectionMatrix();
@@ -326,7 +332,9 @@ renderer.setAnimationLoop(() => {
   mp.setPose({ x: player.pos.x, y: player.pos.y, z: player.pos.z, rot: player.rot, anim: player.anim, t: Date.now() });
   fx.update(dt, player.camera);
 
-  if (island) {
+  mmAcc += dt;
+  if (island && mmAcc > 0.1) {
+    mmAcc = 0;
     minimap.update(
       { x: player.pos.x, z: player.pos.z, rot: player.rot },
       entities.npcList().map((n) => {
@@ -338,8 +346,10 @@ renderer.setAnimationLoop(() => {
     );
   }
 
-  irsArena.update(dt, player.pos);
-  fight.update(dt); // after player + arena so shake lands on the final camera
+  if (inArena) {
+    irsArena.update(dt, player.pos);
+    fight.update(dt); // after player + arena so shake lands on the final camera
+  }
   if (irsKnocked && !nearIrsDoor()) irsKnocked = false; // walked away; knock again
 
   // Interaction prompt.

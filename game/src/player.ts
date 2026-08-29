@@ -20,6 +20,9 @@ export class Player {
   /** When set, movement lives in this rectangular room (the boss arena)
    *  instead of the island grid — a flat floor and four hard walls. */
   private arena: { minX: number; maxX: number; minZ: number; maxZ: number; y: number } | null = null;
+  /** One-frame flag: after a teleport the camera snaps to its new berth
+   *  instead of flying there — a cross-map lerp is a guided tour of the void. */
+  private camSnap = false;
   private readonly keys = new Set<string>();
   private camYaw = Math.PI * 0.85;
   private camPitch = 0.52;
@@ -65,6 +68,7 @@ export class Player {
   /** Drop the hero somewhere else on the island (cart rides, cutscenes). */
   teleport(to: THREE.Vector3): void {
     this.pos.set(to.x, to.y, to.z);
+    this.camSnap = true;
     if (this.arena) {
       this.groundY = this.arena.y;
       this.pos.y = this.groundY;
@@ -148,7 +152,12 @@ export class Player {
       wanted.z = THREE.MathUtils.clamp(wanted.z, this.arena.minZ, this.arena.maxZ);
       wanted.y = THREE.MathUtils.clamp(wanted.y, this.arena.y + 0.5, this.arena.y + 7.2);
     }
-    this.camera.position.lerp(wanted, Math.min(1, dt * 10));
+    if (this.camSnap) {
+      this.camera.position.copy(wanted);
+      this.camSnap = false;
+    } else {
+      this.camera.position.lerp(wanted, Math.min(1, dt * 10));
+    }
     this.camera.lookAt(target);
   }
 }

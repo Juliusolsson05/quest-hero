@@ -27,7 +27,7 @@ const fail = (e: unknown) => ({
   isError: true,
 });
 
-function buildServer(): McpServer {
+export function buildServer(): McpServer {
   const server = new McpServer({ name: 'mark', version: '0.1.0' });
 
   server.registerTool(
@@ -159,6 +159,8 @@ app.get('/question/:id', (req, res) => {
 
 app.get('/health', (_req, res) => res.json({ ok: true, tools: 3, questions: QUESTIONS.length, keys_required: 0 }));
 
-app.listen(PORT, () => {
+// On Vercel this module is imported for buildServer() by /api/mcp/mark — binding
+// a port there would crash the function runtime.
+if (!process.env.VERCEL) app.listen(PORT, () => {
   console.log(`mark MCP on http://localhost:${PORT}/mcp  (3 tools, ${QUESTIONS.length} questions, no API keys)`);
 });

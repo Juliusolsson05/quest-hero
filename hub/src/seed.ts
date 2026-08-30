@@ -79,6 +79,17 @@ export async function seedTrueForge(): Promise<void> {
       },
       'mcp wall-street',
     ));
+    jobs.push(put(
+      '/api/v1/settings/mcp-servers',
+      {
+        type: 'remote',
+        name: 'mark',
+        url: `${origin}/api/mcp/mark`,
+        description:
+          'Mark the startup enemy: SF trivia questions with deterministic answer judging and taunt material for the boss fight.',
+      },
+      'mcp mark',
+    ));
   }
 
   if (process.env.BRIGHT_DATA_API_TOKEN) {

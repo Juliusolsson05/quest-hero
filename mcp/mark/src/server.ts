@@ -2,8 +2,8 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import express from 'express';
 import { z } from 'zod';
-import { CANNED_TAUNTS, QUESTIONS } from './sources';
-import { judge, nextQuestion, questionById } from './judge';
+import { CANNED_TAUNTS, QUESTIONS } from './sources.js';
+import { judge, nextQuestion, questionById } from './judge.js';
 
 /**
  * Mark the startup enemy, as tools. Three of them, all read-only (annotated so

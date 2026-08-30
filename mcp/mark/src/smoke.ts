@@ -1,5 +1,5 @@
-import { QUESTIONS } from './sources';
-import { judge, nextQuestion } from './judge';
+import { QUESTIONS } from './sources.js';
+import { judge, nextQuestion } from './judge.js';
 
 /**
  * Smoke, not unit tests: prove the bank is coherent and the judge honors

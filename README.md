@@ -148,7 +148,27 @@ Both MCP servers need registering in TrueForge once — see the `curl` in each s
 The game is fully playable with zero keys configured: NPCs fall back to canned lines until
 TrueForge has a model, and characters use kawaii voxel placeholders until Tripo GLBs land.
 
-## Share it (sf-quest.vercel.app)
+## Play it hosted
+
+The whole stack runs in the cloud — nothing on a laptop:
+
+| Piece | Where | URL |
+| --- | --- | --- |
+| Game + MCP servers (`/api/mcp/sf-guide`, `/api/mcp/wall-street`) | Vercel | https://quest-hero-lake.vercel.app (→ sfquest.online) |
+| World Hub (WS/REST) + TrueForge | Railway, one container | wss://world-production-6d29.up.railway.app/ws (→ hub.sfquest.online) |
+
+TrueForge never gets a public URL — standalone mode has no auth, so it lives on the
+container's loopback next to the hub, and `hub/src/seed.ts` provisions it at boot from env:
+`OPENAI_API_KEY` (model provider), `GAME_ORIGIN` (registers the Vercel MCP endpoints),
+`BRIGHT_DATA_API_TOKEN` (live web search for every NPC), `TAVILY_API_KEY` (optional stand-in).
+
+**Deploy your own:** [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/Juliusolsson05/quest-hero)
+gets you the game + MCPs (zero env vars). Then on Railway: create a project, add a service
+with `RAILWAY_DOCKERFILE_PATH=deploy/world/Dockerfile`, a volume at `/data`, set the env
+above plus `GAME_ORIGIN=<your Vercel URL>`, deploy with `railway up`, and set Vercel's
+`VITE_HUB_WS=wss://<railway-domain>/ws` so the hosted build finds your hub.
+
+## Share it from a laptop (tunnel mode)
 
 The hosted client generates the city itself, so the link works with nothing running — but the
 citizens live in your hub, and a hosted page cannot reach `ws://localhost` (that address is the

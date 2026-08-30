@@ -12,10 +12,11 @@ import { Entities } from './entities';
 import { CityFeed } from './feed';
 import { Atmosphere } from './fx';
 import { HubLink } from './hublink';
-import { IrsEncounter } from './irs';
+import { ARENA_PRIVACY_ZONE, IrsEncounter } from './irs';
 import { Minimap } from './minimap';
 import { Multiplayer } from './mp';
 import { Player } from './player';
+import { Sound } from './sound';
 import { initProps3d } from './props3d';
 import { StartScreen } from './start';
 import { TouchControls } from './touch';
@@ -50,6 +51,9 @@ const bubbles = new Bubbles();
 const ui = new Ui();
 const feed = new CityFeed();
 const minimap = new Minimap();
+const sound = new Sound();
+addEventListener('pointerdown', () => sound.unlock(), { once: false });
+addEventListener('keydown', () => sound.unlock(), { once: true });
 new TouchControls(player); // joystick + compact chrome on coarse-pointer devices
 // A lid, not a gate: everything above already renders behind it from the
 // first frame, so the bar below reports asset streaming, not readiness.
@@ -115,12 +119,15 @@ const boardPos: THREE.Vector3 | null = (() => {
 })();
 
 // ── the sea ────────────────────────────────────────────────────────────────
-player.onEnterWater = (x, z) => waterFx.splash(x, z, 1);
+player.onEnterWater = (x, z) => { waterFx.splash(x, z, 1); sound.splash(); };
 player.onLeaveWater = () => waterFx.splash(player.pos.x, player.pos.z, 0.5);
 player.onCurrent = () => ui.toast('the current out here is brutal — best turn back', '🌊');
 
 // ── features ────────────────────────────────────────────────────────────────
-const toast = (text: string, icon: string) => ui.toast(text, icon);
+const toast = (text: string, icon: string) => {
+  sound.toast();
+  ui.toast(text, icon);
+};
 
 const cartly = new Cartly(scene, player, () => island, {
   toast,
@@ -131,12 +138,42 @@ const cartly = new Cartly(scene, player, () => island, {
 });
 
 const irs = new IrsEncounter(scene, generatedIsland, player, toast);
-irs.onSeclusion = (secluded) => { mp.avatarsVisible = !secluded; };
+irs.onSeclusion = (secluded) => {
+  mp.avatarsVisible = !secluded;
+  document.body.classList.toggle('infight', secluded); // touch chrome hides via CSS
+  sound.setAmbient(secluded ? 'arena' : 'town');
+  if (!secluded) sound.stopMusic();
+};
+sound.setAmbient('town');
+irs.sfxKnock = () => sound.knock();
+irs.setFightSfx({
+  shot: () => sound.shot(),
+  hit: () => sound.hit(),
+  rocket: () => sound.rocket(),
+  explosion: (big: boolean) => sound.explosion(big),
+  lock: () => sound.laserLock(),
+  hurt: () => sound.hurt(),
+  tick: (last: boolean) => sound.countdownTick(last),
+  verdict: (ok: boolean) => sound.verdict(ok),
+  victory: () => sound.victory(),
+  defeat: () => sound.defeat(),
+  panel: () => sound.uiOpen(),
+});
+bubbles.onCommit = () => sound.bubblePop();
+irs.seat = {
+  tryClaim: () => mp.tryClaimArena(),
+  heartbeat: () => mp.heartbeatArena(),
+  release: () => mp.releaseArena(),
+};
+// Mark trash-talks in the same kawaii bubbles as every citizen.
+irs.speak = (text) => bubbles.push('mark', 'Mark', '#ffd9c9', 'commit', text, 'neutral');
+bubbles.pinned.add('mark'); // the boss is heard across the whole arena, always
+mp.privacyZones.push(ARENA_PRIVACY_ZONE); // nobody renders inside anyone's audit
 
-const hub = new HubLink({ player, entities, ui, fx, bubbles, feed, cartly });
+const hub = new HubLink({ player, entities, ui, fx, bubbles, feed, cartly, irs });
 
 if (import.meta.env.DEV) { // console-inspection only — never shipped
-  (window as unknown as Record<string, unknown>).__sfq = { island, player, mp, cartly, irs, renderer };
+  (window as unknown as Record<string, unknown>).__sfq = { island, player, mp, cartly, irs, sound, ui, hub, renderer };
 }
 
 // ── interactions: ONE priority list serves both the E key and the pill ─────
@@ -188,7 +225,21 @@ addEventListener('keydown', (e) => {
   if (document.body.dataset.typing === '1') return;
   if (e.code === 'KeyP') { cartly.togglePhone(nearestPoiLabel()); return; }
   if (e.code === 'KeyL') { feed.toggle(); return; }
+  if (e.code === 'KeyM') {
+    const muted = sound.toggleMute();
+    muteChip.textContent = muted ? '🔇' : '🔊';
+    return;
+  }
   if (e.code === 'KeyE') interact();
+});
+
+document.querySelector('#hud')!.insertAdjacentHTML(
+  'beforeend', `<span class="chip link" id="c-mute">🔊</span>`);
+const muteChip = document.querySelector<HTMLElement>('#c-mute')!;
+if (sound.isMuted) muteChip.textContent = '🔇';
+muteChip.addEventListener('click', () => {
+  sound.unlock();
+  muteChip.textContent = sound.toggleMute() ? '🔇' : '🔊';
 });
 
 addEventListener('resize', () => {
@@ -206,6 +257,7 @@ setTimeout(() => start.ready(), 9000);
 const playerAnchor = new THREE.Vector3();
 const clock = new THREE.Clock();
 let mmAcc = 0;
+let lastPrompt: string | null = null;
 const sizeProbe = new THREE.Vector2();
 renderer.setAnimationLoop(() => {
   // Some hosts (emulated viewports, panes) never fire `resize` — poll instead.
@@ -218,10 +270,21 @@ renderer.setAnimationLoop(() => {
   }
   const dt = Math.min(clock.getDelta(), 0.1);
   player.update(dt);
+  sound.movement(player.anim, dt);
+  if (irs.secluded && irs.fightActive) {
+    if (irs.fightFrozen) sound.stopMusic();
+    else {
+      sound.startMusic();
+      sound.setMusicIntensity(irs.bossDesperate ? 1 : 0);
+    }
+  }
   cartly.update(dt); // after player.update so a ride overrides the hero's pose
   entities.update(dt);
   mp.update(dt);
-  mp.setPose({ x: player.pos.x, y: player.pos.y, z: player.pos.z, rot: player.rot, anim: player.anim, t: Date.now() });
+  // While secluded in the audit, the public pose parks at the office door —
+  // other players never even receive arena coordinates.
+  const pub = irs.secluded ? irs.doorstep : player.pos;
+  mp.setPose({ x: pub.x, y: pub.y, z: pub.z, rot: player.rot, anim: irs.secluded ? 'idle' : player.anim, t: Date.now() });
   if (player.swimming) waterFx.trail(player.pos.x, player.pos.z, player.anim !== 'idle', dt);
   waterFx.update(dt);
   fx.update(dt, player.camera);
@@ -245,12 +308,15 @@ renderer.setAnimationLoop(() => {
   if (document.body.dataset.typing !== '1') {
     let prompt: string | null = null;
     for (const i of interactables) { prompt = i.prompt(); if (prompt) break; }
+    if (prompt && prompt !== lastPrompt) sound.uiPop(); // something new to do here
+    lastPrompt = prompt;
     ui.setPrompt(prompt);
   } else ui.setPrompt(null);
 
   bubbles.update(dt, player.camera, (who) =>
     who === 'player'
       ? playerAnchor.set(player.pos.x, player.pos.y + 2.05, player.pos.z)
+      : who === 'mark' ? irs.markAnchor()
       : entities.anchor(who));
 
   composer.render();

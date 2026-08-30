@@ -16,15 +16,20 @@ import { C } from '../world';
 export const MARK_LINE = 'You are NEVER going to make it as a founder';
 
 const HALF = 16;
+// Far past EVERYTHING: the painted-distance scenery (rocks to ~154 from the
+// island's center, headlands to ~330, the skyline to ~390) must never poke
+// through the chamber walls. 520 out is open void to the horizon.
+const CX = 520;
+const CZ = -60;
 export const IRS_ARENA = {
-  cx: 160,
-  cz: -60,
+  cx: CX,
+  cz: CZ,
   floorY: 1,
   /** Where the player materialises: just inside the south door. */
-  entrance: { x: 160, z: -60 + HALF - 2.6 },
+  entrance: { x: CX, z: CZ + HALF - 2.6 },
   bounds: {
-    minX: 160 - HALF + 0.7, maxX: 160 + HALF - 0.7,
-    minZ: -60 - HALF + 0.7, maxZ: -60 + HALF - 0.7,
+    minX: CX - HALF + 0.7, maxX: CX + HALF - 0.7,
+    minZ: CZ - HALF + 0.7, maxZ: CZ + HALF - 0.7,
     y: 1,
     blockers: [] as { x: number; z: number; r: number }[],
   },

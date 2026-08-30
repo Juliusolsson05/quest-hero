@@ -224,6 +224,9 @@
                              background: #a8e6cf; box-shadow: 0 3px 0 rgba(53,49,63,.2);
                              pointer-events: none; transition: transform .06s linear; }
       body.touch #minimap { display: none; } /* thumbs need the corners more than the map */
+      /* during the audit the phone stays in your pocket: chips, pulse and
+         phone buttons all clear the screen for the fight (touch only) */
+      body.touch.infight #hud, body.touch.infight #feedbtn, body.touch.infight #phonebtn { display: none; }
       body.touch .pb-key { display: none; }
       body.touch #prompt kbd { display: none; }
       body.touch #prompt { bottom: 22%; padding: 10px 20px; font-size: 16px; }

@@ -19,7 +19,7 @@ export class Ui {
   private readonly prompt: HTMLDivElement;
   private readonly questPanel: HTMLDivElement;
   private quests: Quest[] = [];
-  private talkTarget: string | null = null;
+  talkTarget: string | null = null;
   private lastPrompt: string | null = null;
 
   onSay: (npcId: string, text: string) => void = () => {};
@@ -50,6 +50,19 @@ export class Ui {
     this.toasts = document.querySelector('#toasts')!;
     this.prompt = document.querySelector('#prompt')!;
     this.talk = document.querySelector('#talkbar')!;
+
+    // Mobile keyboards eat the bottom half of the screen — and the talk bar
+    // with it. visualViewport tells us the keyboard's true height; the bar
+    // rides just above it and returns to its resting spot on close.
+    const vv = window.visualViewport;
+    if (vv) {
+      const relayout = () => {
+        const kb = Math.max(0, innerHeight - vv.height - vv.offsetTop);
+        this.talk.style.bottom = kb > 40 ? `${kb + 10}px` : '';
+      };
+      vv.addEventListener('resize', relayout);
+      vv.addEventListener('scroll', relayout);
+    }
     this.talkWho = this.talk.querySelector('.t-who')!;
     this.talkInput = this.talk.querySelector('.t-input')!;
     this.questPanel = document.querySelector('#questpanel')!;
@@ -108,6 +121,10 @@ export class Ui {
 
   // ── talk bar ──
   get talking(): string | null { return this.talkTarget; }
+  /** The NPC id the talk bar is open on, or null — main refreshes the
+   *  hub-side conversation hold off this while it stays open. */
+  get talkingTo(): string | null { return this.talkTarget; }
+
   openTalk(npcId: string, label: string): void {
     this.talkTarget = npcId;
     this.talkWho.textContent = label;

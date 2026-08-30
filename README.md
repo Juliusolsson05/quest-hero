@@ -90,6 +90,8 @@ Configuration lives in YAML catalogs (models, MCP servers, sandbox) and git-back
 
 **`quest-hero-world`** — the game exposed as tools. Reads: player inventory, position, quest state, faction standing, the rules of combat and crafting. Writes: give item, advance quest, set waypoint. Writes are the ones that go behind an approval gate.
 
+**`quest-hero-mark`** — the boss fight's brain-stem ([mcp/mark](mcp/mark)): SF trivia with deterministic judging and taunt material. Mark the startup enemy recites questions and gloats through a TrueForge session; correctness — and therefore boss-fight damage — comes from the tool, never the model.
+
 **`quest-hero-web`** — live web data via [Bright Data](https://brightdata.com), so a character can speak to what is true today. Scraper configuration is committed to the repo and reused by the agent automatically, and the pipeline is expected to notice when a target site changes and repair itself rather than silently going stale.
 
 Two more shipped, each attached to exactly one character — withholding a tool is far more reliable than instructing a model not to use it:
@@ -139,10 +141,11 @@ npm --prefix hub install && npm --prefix hub run dev    # 2. World Hub on :7777
 npm --prefix game install && npm --prefix game run dev  # 3. game on :5173
 npm --prefix mcp/sf-guide install --include=dev && npm --prefix mcp/sf-guide run dev        # 4. SF data MCP on :8811
 npm --prefix mcp/wall-street install --include=dev && npm --prefix mcp/wall-street run dev  # 5. markets MCP on :8812
+npm --prefix mcp/mark install --include=dev && npm --prefix mcp/mark run dev                # 6. Mark's trivia MCP on :8813
 node tools/tripo.mjs                     # optional: generate rigged characters (needs TRIPO_API_KEY in .env)
 ```
 
-Both MCP servers need registering in TrueForge once — see the `curl` in each server's README.
+All three MCP servers need registering in TrueForge once — see the `curl` in each server's README.
 `--include=dev` matters: `NODE_ENV=production` in the shell makes npm skip devDependencies silently.
 
 The game is fully playable with zero keys configured: NPCs fall back to canned lines until

@@ -10,6 +10,7 @@ import type { NextFunction, Request, Response } from 'express';
 import { WebSocketServer, WebSocket } from 'ws';
 import type { ClientFrame, ServerFrame } from '../../shared/protocol';
 import { mountApi } from './api';
+import { makeBossChannel } from './boss';
 import { mountPhoto } from './photo';
 import { startChatter } from './chatter';
 import { CONFIG } from './config';
@@ -56,6 +57,11 @@ wss.on('connection', (ws) => {
   const welcome: ServerFrame = { t: 'welcome', world: worldSnapshot(), island, you: 'player' };
   ws.send(JSON.stringify(welcome));
 
+  // Mark's channel is per-connection: his questions are for YOUR screen only.
+  const boss = makeBossChannel((f) => {
+    if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(f));
+  });
+
   ws.on('message', (raw) => {
     let frame: ClientFrame;
     try {
@@ -76,6 +82,9 @@ wss.on('connection', (ws) => {
           break;
         case 'quest':
           if (frame.action === 'accept') acceptQuest(frame.id);
+          break;
+        case 'boss':
+          boss.handle(frame);
           break;
         case 'interact':
           // The player opened (or is keeping open) a conversation: the NPC

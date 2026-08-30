@@ -131,7 +131,9 @@ async function buildManifest(def: AgentDef): Promise<TrueForgeApi.AgentSpec> {
           mcpServers: names.map((name): TrueForgeApi.McpServer =>
             // Deferred tool loading everywhere (the native default), with one
             // selective preload: current SF weather is asked constantly.
-            name === 'sf-guide' ? { name, preloadTools: ['sf_live_conditions'] } : { name },
+            name === 'sf-guide' ? { name, preloadTools: ['sf_live_conditions'] }
+            : name === 'mark' ? { name, preload: true } // tiny server, every round calls it
+            : { name },
           ),
         }
       : {}),
@@ -262,6 +264,9 @@ export interface TurnCallbacks {
   onTool?: (label: string) => void;
   /** a subagent thread spun up (its text stays out of the bubble) */
   onThread?: (title: string) => void;
+  /** raw MCP tool result content, with the tool's name resolved from its
+   *  call — the machine side-channel (verdicts as data, not prose) */
+  onToolResponse?: (name: string, content: string) => void;
   /** fires on every event off the wire — reasoning deltas, system tool
    *  calls, keep-alives — so a stall watchdog measures a dead stream, not a
    *  quiet one */
@@ -369,6 +374,15 @@ export async function streamTurn(
         // A call whose args never parsed still deserves its name-only badge.
         for (const e of events.values()) {
           if (e.type === 'model.message' && e.threadId === 'main') badgeCalls(e, true);
+        }
+        if (cb.onToolResponse && typeof event.content === 'string') {
+          let name = '';
+          for (const e of events.values()) {
+            if (e.type !== 'model.message') continue;
+            const call = e.toolCalls?.find((tc) => tc.id === event.toolCallId);
+            if (call) { name = call.toolInfo?.name ?? call.function?.name ?? ''; break; }
+          }
+          cb.onToolResponse(name, event.content);
         }
         break;
       }

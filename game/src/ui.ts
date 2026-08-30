@@ -20,6 +20,7 @@ export class Ui {
   private readonly questPanel: HTMLDivElement;
   private quests: Quest[] = [];
   talkTarget: string | null = null;
+  private lastPrompt: string | null = null;
 
   onSay: (npcId: string, text: string) => void = () => {};
   onAccept: (questId: string) => void = () => {};
@@ -112,6 +113,8 @@ export class Ui {
   }
 
   setPrompt(html: string | null): void {
+    if (html === this.lastPrompt) return; // called every frame; skip same-value DOM writes
+    this.lastPrompt = html;
     if (html) { this.prompt.innerHTML = html; this.prompt.classList.add('on'); }
     else this.prompt.classList.remove('on');
   }

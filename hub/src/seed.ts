@@ -81,6 +81,24 @@ export async function seedTrueForge(): Promise<void> {
     ));
   }
 
+  if (process.env.BRIGHT_DATA_API_TOKEN) {
+    // Name must stay 'bright-data': it is first in trueforge.ts WEB_CONNECTORS,
+    // so every webAccess NPC picks it up as their primary web search the
+    // moment it exists. Hosted endpoint verified to accept Bearer auth.
+    jobs.push(put(
+      '/api/v1/settings/mcp-servers',
+      {
+        type: 'remote',
+        name: 'bright-data',
+        url: 'https://mcp.brightdata.com/mcp',
+        description:
+          'Bright Data live web access: search_engine for fresh results, scrape_as_markdown to read a page in full.',
+        auth: { type: 'header', headers: { Authorization: `Bearer ${process.env.BRIGHT_DATA_API_TOKEN}` } },
+      },
+      'mcp bright-data',
+    ));
+  }
+
   if (process.env.TAVILY_API_KEY) {
     jobs.push(put(
       '/api/v1/settings/mcp-servers',

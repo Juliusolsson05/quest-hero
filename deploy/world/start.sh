@@ -10,7 +10,10 @@ export SQLITE_PATH="${SQLITE_PATH:-/data/db.sqlite}"
 [ -s /data/trueforge-sessions.json ] || echo '{}' > /data/trueforge-sessions.json
 ln -sf /data/trueforge-sessions.json /app/hub/.trueforge-sessions.json
 
-trueforge &
+# Railway injects PORT for the public listener (the hub). TrueForge honors
+# PORT too, so without the override both processes fight for the same port —
+# pin the harness to loopback's 8790 explicitly.
+PORT=8790 trueforge &
 
 # Wait for the harness before the hub boots, so the boot-time seed (models +
 # MCP connectors) and agent registration land on a listening server. The hub

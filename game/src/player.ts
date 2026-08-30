@@ -4,6 +4,8 @@ import { SEA_Y, type IslandView } from './world';
 import { CharacterView } from './chars';
 import { angleToward } from './util';
 
+const UP = new THREE.Vector3(0, 1, 0);
+
 /**
  * Third-person controller: the hero walks the island, a spring-arm camera
  * follows. Drag to orbit, wheel to zoom, WASD moves relative to the camera,
@@ -54,6 +56,12 @@ export class Player {
   private squashY = 1;
   private t = 0;
   private pushed = false; // already told about the current on this excursion
+
+  // update()/finish() scratch — reused every frame instead of allocated.
+  private readonly moveDir = new THREE.Vector3();
+  private readonly camTarget = new THREE.Vector3();
+  private readonly camOff = new THREE.Vector3();
+  private readonly camWanted = new THREE.Vector3();
 
   private static readonly WALK = 3.4;
   private static readonly RUN = 6.4;
@@ -228,9 +236,9 @@ export class Player {
 
     if (moving && this.island) {
       const speed = this.swimming ? Player.SWIM : running ? Player.RUN : Player.WALK;
-      const dir = new THREE.Vector3(str, 0, -fwd)
+      const dir = this.moveDir.set(str, 0, -fwd)
         .normalize()
-        .applyAxisAngle(new THREE.Vector3(0, 1, 0), this.camYaw);
+        .applyAxisAngle(UP, this.camYaw);
       // Axis-separated moves so we slide along blocked tiles and walls instead
       // of sticking; passable() covers water, ledges and building footprints.
       // In the arena the room's rectangle is the whole law — plus the cover
@@ -337,13 +345,13 @@ export class Player {
     this.view.root.rotation.y = this.rot;
 
     // Spring-arm camera.
-    const target = new THREE.Vector3(this.pos.x, this.pos.y + 1.35, this.pos.z);
-    const off = new THREE.Vector3(
+    const target = this.camTarget.set(this.pos.x, this.pos.y + 1.35, this.pos.z);
+    const off = this.camOff.set(
       Math.sin(this.camYaw) * Math.cos(this.camPitch),
       Math.sin(this.camPitch),
       Math.cos(this.camYaw) * Math.cos(this.camPitch),
     ).multiplyScalar(this.camDist);
-    const wanted = target.clone().add(off);
+    const wanted = this.camWanted.copy(target).add(off);
     if (this.island && !this.arena) {
       // When a building would occlude the hero, pull in — but never far enough
       // to end up inside the wall. Past halfway the camera climbs instead, so

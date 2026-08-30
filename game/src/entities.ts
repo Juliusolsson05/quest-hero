@@ -16,6 +16,7 @@ export class Entities {
   private animals = new Map<string, { view: AnimalView; target: THREE.Vector3; rot: number; kind: Animal['kind'] }>();
   private objects = new Map<string, THREE.Group>();
   private pops: { obj: THREE.Object3D; t: number }[] = [];
+  private readonly anchorV = new THREE.Vector3();
 
   syncNpcs(list: Npc[]): void {
     for (const n of list) {
@@ -77,11 +78,14 @@ export class Entities {
   npc(id: string) { return this.npcs.get(id); }
   npcList(): Npc[] { return [...this.npcs.values()].map((e) => e.data); }
 
-  /** World anchor for a speaker's bubble (above the head). */
+  /** World anchor for a speaker's bubble (above the head). Returns a reused
+   *  scratch vector — called per bubble per frame; callers copy it right away. */
   anchor(who: string): THREE.Vector3 | null {
     const n = this.npcs.get(who);
-    if (n) return n.view.root.position.clone().add(new THREE.Vector3(0, 2.1, 0));
-    return null;
+    if (!n) return null;
+    this.anchorV.copy(n.view.root.position);
+    this.anchorV.y += 2.1;
+    return this.anchorV;
   }
 
   nearestNpc(pos: THREE.Vector3, maxDist: number): Npc | null {

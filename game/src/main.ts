@@ -32,7 +32,7 @@ import { buildIsland, IslandView } from './world';
  */
 
 const COARSE = matchMedia('(pointer: coarse)').matches;
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
 renderer.setPixelRatio(Math.min(devicePixelRatio, COARSE ? 1.75 : 2)); // phone GPUs breathe easier
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
@@ -136,7 +136,7 @@ irs.onSeclusion = (secluded) => { mp.avatarsVisible = !secluded; };
 const hub = new HubLink({ player, entities, ui, fx, bubbles, feed, cartly });
 
 if (import.meta.env.DEV) { // console-inspection only — never shipped
-  (window as unknown as Record<string, unknown>).__sfq = { island, player, mp, cartly, irs };
+  (window as unknown as Record<string, unknown>).__sfq = { island, player, mp, cartly, irs, renderer };
 }
 
 // ── interactions: ONE priority list serves both the E key and the pill ─────
@@ -250,7 +250,7 @@ renderer.setAnimationLoop(() => {
 
   bubbles.update(dt, player.camera, (who) =>
     who === 'player'
-      ? playerAnchor.copy(player.pos).add(new THREE.Vector3(0, 2.05, 0))
+      ? playerAnchor.set(player.pos.x, player.pos.y + 2.05, player.pos.z)
       : entities.anchor(who));
 
   composer.render();

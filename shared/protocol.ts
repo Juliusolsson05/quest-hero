@@ -148,6 +148,10 @@ export interface Island {
 export type BubbleMode = 'delta' | 'commit' | 'ambient' | 'thinking' | 'tool';
 
 export type ServerFrame =
+  /** Mark the startup enemy — sent only to the socket that asked */
+  | { t: 'boss'; ev: 'say'; text: string }
+  | { t: 'boss'; ev: 'question'; qid: string; text: string; deadline: number }
+  | { t: 'boss'; ev: 'verdict'; qid: string; correct: boolean; expected: string; detail: string; line: string }
   | { t: 'welcome'; world: World; island: Island; you: string }
   | { t: 'event'; event: WorldEvent }
   | { t: 'pose'; npcs: Pick<Npc, 'id' | 'pos' | 'rot' | 'anim'>[];
@@ -161,6 +165,10 @@ export type ServerFrame =
 
 export type ClientFrame =
   | { t: 'hello'; name: string }
+  /** boss fight question rounds (per-connection, never broadcast) */
+  | { t: 'boss'; do: 'question' }
+  | { t: 'boss'; do: 'taunt' }
+  | { t: 'boss'; do: 'answer'; qid: string; text: string }
   | { t: 'pose'; pos: Vec3; rot: number; anim: AnimName }
   | { t: 'talk'; npcId: string; text: string }
   | { t: 'interact'; targetId: string }

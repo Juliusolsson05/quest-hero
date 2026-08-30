@@ -28,6 +28,11 @@ export class Bubbles {
   private readonly bubbles = new Map<string, Bubble>();
   private readonly v = new THREE.Vector3();
 
+  /** Speakers exempt from the distance filter (the boss): their bubble stays
+   *  readable across the whole arena, and docks to the top of the screen
+   *  instead of vanishing when the camera turns away. */
+  readonly pinned = new Set<string>();
+
   constructor() {
     this.layer = document.createElement('div');
     this.layer.id = 'bubbles';
@@ -122,16 +127,27 @@ export class Bubbles {
       }
       const anchor = anchorFor(who);
       if (!anchor) { b.root.style.display = 'none'; continue; }
+      const pinned = this.pinned.has(who);
       this.v.copy(anchor).project(camera);
       const behind = this.v.z > 1;
       const dist = camera.position.distanceTo(anchor);
-      if (behind || dist > 26) { b.root.style.display = 'none'; continue; }
+      if (!pinned && (behind || dist > 26)) { b.root.style.display = 'none'; continue; }
       b.root.style.display = '';
+      if (pinned && (behind || this.v.y > 0.9 || this.v.y < -0.9 || this.v.x > 1 || this.v.x < -1)) {
+        // the speaker is off-screen; his words are not — dock as a subtitle
+        b.root.style.left = '50%';
+        b.root.style.top = '24%';
+        b.root.style.transform = 'translate(-50%, -100%) scale(1)';
+        b.root.style.opacity = '';
+        continue;
+      }
       b.root.style.left = `${(this.v.x * 0.5 + 0.5) * innerWidth}px`;
       b.root.style.top = `${(-this.v.y * 0.5 + 0.5) * innerHeight}px`;
-      const s = THREE.MathUtils.clamp(1.12 - dist * 0.022, 0.72, 1.05);
+      const s = pinned
+        ? THREE.MathUtils.clamp(1.12 - dist * 0.022, 0.95, 1.05)
+        : THREE.MathUtils.clamp(1.12 - dist * 0.022, 0.72, 1.05);
       b.root.style.transform = `translate(-50%, -100%) scale(${s})`;
-      b.root.style.opacity = dist > 20 ? '0.35' : '';
+      b.root.style.opacity = !pinned && dist > 20 ? '0.35' : '';
     }
   }
 }

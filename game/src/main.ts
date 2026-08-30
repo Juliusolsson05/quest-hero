@@ -12,7 +12,7 @@ import { Entities } from './entities';
 import { CityFeed } from './feed';
 import { Atmosphere } from './fx';
 import { HubLink } from './hublink';
-import { IrsEncounter } from './irs';
+import { ARENA_PRIVACY_ZONE, IrsEncounter } from './irs';
 import { Minimap } from './minimap';
 import { Multiplayer } from './mp';
 import { Player } from './player';
@@ -131,9 +131,21 @@ const cartly = new Cartly(scene, player, () => island, {
 });
 
 const irs = new IrsEncounter(scene, generatedIsland, player, toast);
-irs.onSeclusion = (secluded) => { mp.avatarsVisible = !secluded; };
+irs.onSeclusion = (secluded) => {
+  mp.avatarsVisible = !secluded;
+  document.body.classList.toggle('infight', secluded); // touch chrome hides via CSS
+};
+irs.seat = {
+  tryClaim: () => mp.tryClaimArena(),
+  heartbeat: () => mp.heartbeatArena(),
+  release: () => mp.releaseArena(),
+};
+// Mark trash-talks in the same kawaii bubbles as every citizen.
+irs.speak = (text) => bubbles.push('mark', 'Mark', '#ffd9c9', 'commit', text, 'neutral');
+bubbles.pinned.add('mark'); // the boss is heard across the whole arena, always
+mp.privacyZones.push(ARENA_PRIVACY_ZONE); // nobody renders inside anyone's audit
 
-const hub = new HubLink({ player, entities, ui, fx, bubbles, feed, cartly });
+const hub = new HubLink({ player, entities, ui, fx, bubbles, feed, cartly, irs });
 
 if (import.meta.env.DEV) { // console-inspection only — never shipped
   (window as unknown as Record<string, unknown>).__sfq = { island, player, mp, cartly, irs };
@@ -221,7 +233,10 @@ renderer.setAnimationLoop(() => {
   cartly.update(dt); // after player.update so a ride overrides the hero's pose
   entities.update(dt);
   mp.update(dt);
-  mp.setPose({ x: player.pos.x, y: player.pos.y, z: player.pos.z, rot: player.rot, anim: player.anim, t: Date.now() });
+  // While secluded in the audit, the public pose parks at the office door —
+  // other players never even receive arena coordinates.
+  const pub = irs.secluded ? irs.doorstep : player.pos;
+  mp.setPose({ x: pub.x, y: pub.y, z: pub.z, rot: player.rot, anim: irs.secluded ? 'idle' : player.anim, t: Date.now() });
   if (player.swimming) waterFx.trail(player.pos.x, player.pos.z, player.anim !== 'idle', dt);
   waterFx.update(dt);
   fx.update(dt, player.camera);
@@ -251,6 +266,7 @@ renderer.setAnimationLoop(() => {
   bubbles.update(dt, player.camera, (who) =>
     who === 'player'
       ? playerAnchor.copy(player.pos).add(new THREE.Vector3(0, 2.05, 0))
+      : who === 'mark' ? irs.markAnchor()
       : entities.anchor(who));
 
   composer.render();

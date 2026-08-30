@@ -4,6 +4,7 @@ import type { Cartly } from './cartly';
 import type { Entities } from './entities';
 import type { CityFeed } from './feed';
 import type { Atmosphere } from './fx';
+import type { IrsEncounter } from './irs';
 import { Net } from './net';
 import type { Player } from './player';
 import type { Ui } from './ui';
@@ -30,6 +31,7 @@ export class HubLink {
     bubbles: Bubbles;
     feed: CityFeed;
     cartly: Cartly;
+    irs: IrsEncounter;
   }) {
     const { player, ui, bubbles, feed } = deps;
     this.net.on((f) => this.apply(f));
@@ -50,6 +52,7 @@ export class HubLink {
       feed.addTalk('you', '#e8f7ee', text);
     };
     ui.onAccept = (id) => this.net.send({ t: 'quest', id, action: 'accept' });
+    deps.irs.sendBoss = (f) => this.net.send(f);
 
     // Conversation hold keep-alive: while the talk bar is open, re-send
     // `interact` every 5s so the hub's ~12s hold slides forward and the NPC
@@ -100,6 +103,7 @@ export class HubLink {
         break;
       }
       case 'pose': entities.applyPose(f); break;
+      case 'boss': this.deps.irs.bossFrame(f); break;
       case 'bubble': {
         const npc = entities.npc(f.who)?.data;
         bubbles.push(f.who, npc ? npcLabel(npc) : f.who, npc?.bubbleTint ?? '#fffdf6', f.mode, f.text, f.emotion);

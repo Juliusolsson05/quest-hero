@@ -1,9 +1,11 @@
 import * as THREE from 'three';
 import {
+  getState,
   insertCoin,
   myPlayer,
   onPlayerJoin,
   getRoomCode,
+  setState,
   type PlayerState,
 } from 'playroomkit';
 import { CharacterView } from './chars';
@@ -74,6 +76,47 @@ export class Multiplayer {
   /** The boss fight is single-player: while false, remote heroes vanish
    *  (scene and minimap both) even though the room stays connected. */
   avatarsVisible = true;
+
+  /** Rectangles nobody may be seen inside (the boss arena): a remote whose
+   *  pose falls in a zone is hidden for everyone, city or chamber. Main
+   *  registers zones so this file never imports feature modules. */
+  readonly privacyZones: { minX: number; maxX: number; minZ: number; maxZ: number }[] = [];
+
+  /** The audit chair: room-level state so only ONE founder fights Mark at a
+   *  time. Heartbeat-staled (12s) so a crashed fighter frees the seat; solo
+   *  and offline always succeed. */
+  private static readonly SEAT_STALE_MS = 12_000;
+
+  tryClaimArena(): boolean {
+    if (this.status !== 'online') return true;
+    try {
+      const me = myPlayer()?.id ?? 'me';
+      const seat = getState('arenaSeat') as { id: string; t: number } | null | undefined;
+      if (seat && seat.id !== me && Date.now() - seat.t < Multiplayer.SEAT_STALE_MS) return false;
+      setState('arenaSeat', { id: me, t: Date.now() }, true);
+      return true;
+    } catch {
+      return true; // a flaky room must never lock the boss away
+    }
+  }
+
+  heartbeatArena(): void {
+    if (this.status !== 'online') return;
+    try {
+      const me = myPlayer()?.id ?? 'me';
+      const seat = getState('arenaSeat') as { id: string; t: number } | null | undefined;
+      if (seat?.id === me) setState('arenaSeat', { id: me, t: Date.now() }, true);
+    } catch { /* next beat retries */ }
+  }
+
+  releaseArena(): void {
+    if (this.status !== 'online') return;
+    try {
+      const me = myPlayer()?.id ?? 'me';
+      const seat = getState('arenaSeat') as { id: string; t: number } | null | undefined;
+      if (seat?.id === me) setState('arenaSeat', null, true);
+    } catch { /* stale seat expires on its own */ }
+  }
 
   private ready = false;
   private readonly remotes = new Map<string, Remote>();
@@ -168,6 +211,10 @@ export class Multiplayer {
       let pose: MpPose | null = null;
       try { pose = (r.p.getState('pose') as MpPose) ?? null; } catch { /* noop */ }
       if (!pose || typeof pose.x !== 'number') continue;
+      if (this.privacyZones.some((z) => pose!.x >= z.minX && pose!.x <= z.maxX && pose!.z >= z.minZ && pose!.z <= z.maxZ)) {
+        r.view.root.visible = false; // mid-audit: their fight is private
+        continue;
+      }
       if (!r.view.root.visible) {
         r.view.root.visible = true;
         r.view.root.position.set(pose.x, pose.y, pose.z);

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { bakeStatics } from '../bake';
 import { angleToward } from '../util';
 import { shadedBox as shadedVoxel } from '../voxel';
 import { C } from '../world';
@@ -191,6 +192,21 @@ export class Taxcollector {
     this.root.add(this.bazooka);
 
     this.root.scale.setScalar(0.92); // ~2.6 tall on a 1.5-tall street
+
+    // Merge the suit. The groups the fight animates stay live; the baked
+    // materials replace the per-part ones in `tintable`, so the hit-flash
+    // tints the whole silhouette exactly as before — through ~6 materials
+    // instead of ~30. (The ENEMY chest plane and DENIED stencil carry canvas
+    // textures, which bakeStatics leaves alone automatically.)
+    this.tintable.length = 0;
+    const groups = [this.torso, this.head, this.armL, this.armR, this.bazooka];
+    for (const baked of [
+      ...bakeStatics(this.root, groups, { privateMaterials: true }),
+      ...groups.flatMap((g) => bakeStatics(g, [], { privateMaterials: true })),
+    ]) {
+      const m = baked.material as THREE.MeshStandardMaterial;
+      if (m.type === 'MeshStandardMaterial') this.tintable.push(m);
+    }
   }
 
   // ── fight hooks (driven by boss-fight.ts) ─────────────────────────────────
@@ -448,6 +464,11 @@ export class IrsArena {
 
     this.boss.root.position.set(cx, floorY, cz - 7);
     this.group.add(this.boss.root);
+
+    // The room never moves: walls, pillars, carpet, desk and strip lights
+    // merge to a couple of meshes. The dome (back-side, flat-shaded), the
+    // signage (canvas textures) and the oculus light are skipped by rule.
+    bakeStatics(this.group, [this.boss.root]);
   }
 
   nearExit(pos: THREE.Vector3): boolean {

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { bakeStatics } from '../bake';
 import { IRS_ARENA, PILLARS, shadedBox, type IrsArena } from './arena';
 import { FightFx } from './fight-fx';
 import type { Player } from '../player';
@@ -96,6 +97,7 @@ export class BossFight {
     this.gun.position.set(0.32, 0.88, 0.18);
     this.gun.rotation.y = -0.08;
     this.gun.visible = false;
+    bakeStatics(this.gun, []); // five parts, two finishes → two meshes
     player.view.root.add(this.gun);
 
     const el = (css: string): HTMLDivElement => {

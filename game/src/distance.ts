@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { SEA_Y } from './world';
 
 /**
@@ -35,6 +36,11 @@ function rnd(n: number): number {
 export function buildDistance(center: THREE.Vector3): Distance {
   const group = new THREE.Group();
   const layers: DistanceLayer[] = [];
+  // Blocks accumulate as transformed geometry and merge to ONE mesh per band —
+  // the bands never move, and the per-frame haze tint lives on the shared
+  // layer material either way, so ~150 draw calls become 3 with no visible
+  // difference.
+  const geosByLayer = new Map<DistanceLayer, THREE.BoxGeometry[]>();
 
   const layer = (baseHex: number, haze: number): DistanceLayer => {
     const base = new THREE.Color(baseHex);
@@ -44,6 +50,7 @@ export function buildDistance(center: THREE.Vector3): Distance {
       haze,
     };
     layers.push(l);
+    geosByLayer.set(l, []);
     return l;
   };
 
@@ -51,16 +58,15 @@ export function buildDistance(center: THREE.Vector3): Distance {
   const block = (
     l: DistanceLayer, a: number, r: number,
     w: number, h: number, d: number, lift = 0,
-  ) => {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), l.material);
-    m.position.set(
+  ): void => {
+    const g = new THREE.BoxGeometry(w, h, d);
+    g.rotateY(-a); // broad face toward the island (about the block's own centre)
+    g.translate(
       center.x + Math.cos(a) * r,
       SEA_Y + lift + h / 2,
       center.z + Math.sin(a) * r,
     );
-    m.rotation.y = -a; // broad face toward the island
-    group.add(m);
-    return m;
+    geosByLayer.get(l)!.push(g);
   };
 
   // ── near band: rocks and stacks out past the swimmable water ──────────────
@@ -110,6 +116,13 @@ export function buildDistance(center: THREE.Vector3): Distance {
   // The two towers that make a skyline recognisable.
   block(city, CITY_A + 0.06, 316, 9, 104, 9);
   block(city, CITY_A - 0.17, 332, 7, 78, 7);
+
+  for (const [l, geos] of geosByLayer) {
+    if (!geos.length) continue;
+    const merged = mergeGeometries(geos);
+    for (const g of geos) g.dispose();
+    group.add(new THREE.Mesh(merged, l.material));
+  }
 
   return { group, layers };
 }

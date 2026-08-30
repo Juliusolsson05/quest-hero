@@ -27,6 +27,16 @@ export class Bubbles {
   private readonly layer: HTMLDivElement;
   private readonly bubbles = new Map<string, Bubble>();
   private readonly v = new THREE.Vector3();
+  private readonly camDir = new THREE.Vector3();
+  private readonly toAnchor = new THREE.Vector3();
+
+  /** Speakers exempt from the distance filter (the boss): the bubble hangs
+   *  over their head at ANY range — but like every bubble, it hides when
+   *  the camera faces away. No screen-docking; that broke attribution. */
+  readonly pinned = new Set<string>();
+
+  /** Fired when a finished line lands (commit/ambient) — main pops the synth. */
+  onCommit: () => void = () => {};
 
   constructor() {
     this.layer = document.createElement('div');
@@ -84,6 +94,7 @@ export class Bubbles {
     else { // commit | ambient
       b.full = text + (EMOTION_ORNAMENT[emotion] && !/[✨💧❗💭]$/.test(text) ? ` ${EMOTION_ORNAMENT[emotion]}` : '');
       if (mode === 'ambient') { b.shown = b.full.length; b.text.textContent = b.full; }
+      this.onCommit();
       b.done = true;
       b.expireAt = performance.now() + Math.max(3200, b.full.length * 55);
       if (emotion === 'shock') {
@@ -122,16 +133,22 @@ export class Bubbles {
       }
       const anchor = anchorFor(who);
       if (!anchor) { b.root.style.display = 'none'; continue; }
+      const pinned = this.pinned.has(who);
+      // NDC z is unreliable for points behind the camera (negative-w flip);
+      // "behind" is a plain dot product against where the camera looks.
+      camera.getWorldDirection(this.camDir);
+      this.toAnchor.subVectors(anchor, camera.position);
+      const behind = this.toAnchor.dot(this.camDir) < 0;
       this.v.copy(anchor).project(camera);
-      const behind = this.v.z > 1;
       const dist = camera.position.distanceTo(anchor);
-      if (behind || dist > 26) { b.root.style.display = 'none'; continue; }
+      // facing away hides EVERY bubble; distance only hides unpinned ones
+      if (behind || (!pinned && dist > 26)) { b.root.style.display = 'none'; continue; }
       b.root.style.display = '';
       b.root.style.left = `${(this.v.x * 0.5 + 0.5) * innerWidth}px`;
       b.root.style.top = `${(-this.v.y * 0.5 + 0.5) * innerHeight}px`;
-      const s = THREE.MathUtils.clamp(1.12 - dist * 0.022, 0.72, 1.05);
+      const s = THREE.MathUtils.clamp(1.12 - dist * 0.022, pinned ? 0.92 : 0.72, 1.05);
       b.root.style.transform = `translate(-50%, -100%) scale(${s})`;
-      b.root.style.opacity = dist > 20 ? '0.35' : '';
+      b.root.style.opacity = !pinned && dist > 20 ? '0.35' : '';
     }
   }
 }

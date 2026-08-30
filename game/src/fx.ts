@@ -37,6 +37,9 @@ const WEATHER_MOD: Record<WeatherKind, { sun: number; grey: number; fogFar: numb
 };
 
 const CENTER = new THREE.Vector3(48, 2, 50);
+// Frame-loop scratch: update() runs at 60Hz and must allocate nothing.
+const GREY = new THREE.Color(0x9aa4ad);
+const WHITE = new THREE.Color(0xffffff);
 
 export class Atmosphere {
   private readonly hemi: THREE.HemisphereLight;
@@ -54,7 +57,7 @@ export class Atmosphere {
   private smokeAges: number[] = [];
   private spray: THREE.Points | null = null;
   private lampLights: THREE.PointLight[] = [];
-  private lampHeads: THREE.Mesh[] = [];
+  private lampHeads: THREE.InstancedMesh | null = null;
   private water: BuiltWorld['water'] = null;
   private sea: THREE.Object3D | null = null;
   private distance: DistanceLayer[] = [];
@@ -66,6 +69,14 @@ export class Atmosphere {
   private flashT = 0;
   private nextFlash = 8;
   private t = 0;
+
+  // update() scratch — reused every frame instead of allocated (GC hitches).
+  private readonly stop = { sky: new THREE.Color(), horizon: new THREE.Color(),
+                            sun: new THREE.Color(), sunInt: 0, hemiInt: 0, fogFar: 0 };
+  private readonly lerpTmp = new THREE.Color();
+  private readonly skyMix = new THREE.Color();
+  private readonly horizonMix = new THREE.Color();
+  private readonly sunDir = new THREE.Vector3();
 
   constructor(private readonly scene: THREE.Scene) {
     this.hemi = new THREE.HemisphereLight(0xbfd9f5, 0x8a7f6a, 1.0);
@@ -148,21 +159,24 @@ export class Atmosphere {
     this.water = built.water;
     this.sea = built.sea;
 
-    // Lamp glow heads + a few real lights (physical lights are pricey — cap them).
-    for (const [i, p] of built.lamps.entries()) {
-      const head = new THREE.Mesh(
+    // Lamp glow heads: every head shows the same colour at the same moment, so
+    // they render as ONE InstancedMesh with one shared material. The few real
+    // lights stay as they were (physical lights are pricey — cap them).
+    if (built.lamps.length) {
+      this.lampHeads = new THREE.InstancedMesh(
         new THREE.BoxGeometry(0.3, 0.26, 0.3),
         new THREE.MeshBasicMaterial({ color: 0x6a614f }),
+        built.lamps.length,
       );
-      head.position.copy(p);
-      this.scene.add(head);
-      this.lampHeads.push(head);
-      if (i < 5) {
-        const l = new THREE.PointLight(0xffc97a, 0, 11, 2);
-        l.position.copy(p).add(new THREE.Vector3(0, -0.1, 0));
-        this.scene.add(l);
-        this.lampLights.push(l);
-      }
+      const m = new THREE.Matrix4();
+      built.lamps.forEach((p, i) => this.lampHeads!.setMatrixAt(i, m.makeTranslation(p.x, p.y, p.z)));
+      this.scene.add(this.lampHeads);
+    }
+    for (const p of built.lamps.slice(0, 5)) {
+      const l = new THREE.PointLight(0xffc97a, 0, 11, 2);
+      l.position.copy(p).add(new THREE.Vector3(0, -0.1, 0));
+      this.scene.add(l);
+      this.lampLights.push(l);
     }
     for (const g of built.glows) {
       const l = new THREE.PointLight(g.color, g.strength, 9, 2);
@@ -230,31 +244,31 @@ export class Atmosphere {
     if (kind !== this.weather) { this.weather = kind; this.weatherBlend = 0; }
   }
 
-  private stopAt(h: number): SkyStop {
+  /** Interpolate the 24h colour script at `h` into the reusable `this.stop`. */
+  private stopAt(h: number): void {
     let a = STOPS[0], b = STOPS[STOPS.length - 1];
     for (let i = 0; i < STOPS.length - 1; i++) {
       if (h >= STOPS[i].h && h <= STOPS[i + 1].h) { a = STOPS[i]; b = STOPS[i + 1]; break; }
     }
     const t = (h - a.h) / Math.max(0.001, b.h - a.h);
-    const lc = (x: number, y: number) => new THREE.Color(x).lerp(new THREE.Color(y), t);
-    return {
-      h, sky: lc(a.sky, b.sky).getHex(), horizon: lc(a.horizon, b.horizon).getHex(),
-      sun: lc(a.sun, b.sun).getHex(), sunInt: THREE.MathUtils.lerp(a.sunInt, b.sunInt, t),
-      hemiInt: THREE.MathUtils.lerp(a.hemiInt, b.hemiInt, t),
-      fogFar: THREE.MathUtils.lerp(a.fogFar, b.fogFar, t),
-    };
+    const s = this.stop;
+    s.sky.setHex(a.sky).lerp(this.lerpTmp.setHex(b.sky), t);
+    s.horizon.setHex(a.horizon).lerp(this.lerpTmp.setHex(b.horizon), t);
+    s.sun.setHex(a.sun).lerp(this.lerpTmp.setHex(b.sun), t);
+    s.sunInt = THREE.MathUtils.lerp(a.sunInt, b.sunInt, t);
+    s.hemiInt = THREE.MathUtils.lerp(a.hemiInt, b.hemiInt, t);
+    s.fogFar = THREE.MathUtils.lerp(a.fogFar, b.fogFar, t);
   }
 
   update(dt: number, camera: THREE.Camera): void {
     this.t += dt;
     this.weatherBlend = Math.min(1, this.weatherBlend + dt / 3);
-    const s = this.stopAt(this.hour);
+    this.stopAt(this.hour);
+    const s = this.stop;
     const mod = WEATHER_MOD[this.weather];
-    const grey = new THREE.Color(0x9aa4ad);
-    const mix = (hex: number, g: number) => new THREE.Color(hex).lerp(grey, g * this.weatherBlend);
 
-    const sky = mix(s.sky, mod.grey);
-    const horizon = mix(s.horizon, mod.grey * 0.9);
+    const sky = this.skyMix.copy(s.sky).lerp(GREY, mod.grey * this.weatherBlend);
+    const horizon = this.horizonMix.copy(s.horizon).lerp(GREY, mod.grey * 0.9 * this.weatherBlend);
     this.skyUniforms.top.value.copy(sky);
     this.skyUniforms.bottom.value.copy(horizon);
     // The painted distance hazes toward the horizon rather than into fog, so
@@ -272,13 +286,13 @@ export class Atmosphere {
     const elev = Math.sin(ang), az = Math.cos(ang);
     const night = elev <= 0.02;
     const dir = night
-      ? new THREE.Vector3(0.35, 0.75, -0.4)
-      : new THREE.Vector3(az * 0.9, Math.max(0.08, elev), 0.35 - dayT * 0.2);
+      ? this.sunDir.set(0.35, 0.75, -0.4)
+      : this.sunDir.set(az * 0.9, Math.max(0.08, elev), 0.35 - dayT * 0.2);
     this.sun.position.copy(CENTER).addScaledVector(dir.normalize(), 120);
-    this.sun.color.set(s.sun);
+    this.sun.color.copy(s.sun);
     this.sun.intensity = s.sunInt * THREE.MathUtils.lerp(1, mod.sun, this.weatherBlend);
     this.hemi.intensity = s.hemiInt * THREE.MathUtils.lerp(1, (mod.sun + 1) / 2, this.weatherBlend);
-    this.hemi.color.copy(sky).lerp(new THREE.Color(0xffffff), 0.35);
+    this.hemi.color.copy(sky).lerp(WHITE, 0.35);
     this.hemi.groundColor.set(0x8a7f6a);
 
     // Storm flash.
@@ -288,7 +302,7 @@ export class Atmosphere {
       if (this.flashT > 0) {
         this.flashT -= dt;
         this.hemi.intensity += 3.2 * (this.flashT / 0.22);
-        this.skyUniforms.top.value.lerp(new THREE.Color(0xffffff), this.flashT * 2);
+        this.skyUniforms.top.value.lerp(WHITE, this.flashT * 2);
       }
     }
 
@@ -296,8 +310,9 @@ export class Atmosphere {
     const darkness = THREE.MathUtils.clamp((0.12 - elev) * 4, 0, 1);
     (this.stars.material as THREE.PointsMaterial).opacity = darkness * (this.weather === 'clear' ? 0.9 : 0.25);
     for (const l of this.lampLights) l.intensity = darkness * 14;
-    for (const h of this.lampHeads) {
-      (h.material as THREE.MeshBasicMaterial).color.set(darkness > 0.4 ? 0xffd98a : 0x6a614f);
+    if (this.lampHeads) {
+      (this.lampHeads.material as THREE.MeshBasicMaterial).color
+        .set(darkness > 0.4 ? 0xffd98a : 0x6a614f);
     }
     if (this.fireflies) {
       (this.fireflies.material as THREE.PointsMaterial).opacity =

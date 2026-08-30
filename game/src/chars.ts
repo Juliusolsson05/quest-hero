@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import type { AnimName, NpcLook } from '../../shared/protocol';
+import { bakeStatics } from './bake';
 import { shadedBox as shadedVoxel } from './voxel';
 
 /**
@@ -146,6 +147,10 @@ export class CharacterView {
     hair.castShadow = true;
     this.body = g;
     this.root.add(g);
+    // Batch what never moves relative to its group: legs kick and the head
+    // nods, so those stay live; everything else becomes one mesh per family.
+    bakeStatics(head, []);
+    bakeStatics(g, [...this.legs, head]);
   }
 
   /** Skull + eyes + blush at the standard height; returns the head group. */
@@ -300,6 +305,16 @@ export class CharacterView {
 
     this.body = g;
     this.root.add(g);
+    // Batch the outfit: the animated pieces (legs, head, typing hands, the
+    // phone, the sip arm) stay live; the rest merges to one mesh per family.
+    const live: THREE.Object3D[] = [...this.legs, head];
+    if (this.extras.phone) live.push(this.extras.phone);
+    if (this.extras.hands) live.push(...this.extras.hands);
+    if (this.extras.sipArm) live.push(this.extras.sipArm);
+    bakeStatics(head, []);
+    if (this.extras.phone) bakeStatics(this.extras.phone, []);
+    if (this.extras.sipArm) bakeStatics(this.extras.sipArm, []);
+    bakeStatics(g, live);
   }
 
   /** Swap in the Tripo GLB if the manifest has one for this id. */
@@ -490,6 +505,7 @@ export class AnimalView {
       this.parts.w1 = w1; this.parts.w2 = w2;
       this.root.scale.setScalar(0.8);
     }
+    bakeStatics(this.root, Object.values(this.parts));
   }
 
   update(dt: number): void {

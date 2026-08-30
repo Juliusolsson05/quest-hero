@@ -42,6 +42,17 @@ export class BossFight {
   /** Future MCP question rounds set this to pause the shooter mid-fight. */
   frozen = false;
 
+  /** Sound hooks — main wires these to the synth; defaults keep silence. */
+  sfx = {
+    shot: () => {}, hit: () => {}, rocket: () => {}, explosion: (_big: boolean) => {},
+    lock: () => {}, hurt: () => {}, tick: (_last: boolean) => {},
+    verdict: (_ok: boolean) => {}, victory: () => {}, defeat: () => {}, panel: () => {},
+  };
+  private lastTick = -1;
+
+  /** True when Mark is under 30% — the music leans in. */
+  get desperate(): boolean { return this.markHp / MARK_HP < 0.3; }
+
   private phase: Phase = 'off';
   private t = 0;
   private firing = false;
@@ -196,6 +207,18 @@ export class BossFight {
       'height:8px;margin-top:12px;border-radius:5px;background:#e8e4da;overflow:hidden;';
     this.qClock.innerHTML = '<div style="height:100%;width:100%;background:linear-gradient(90deg,#ffd977,#e4574f)"></div>';
     this.qPanel.append(this.qText, row, this.qClock);
+
+    // On phones the keyboard would cover a centered panel (and its input);
+    // track the visual viewport and keep the panel inside the visible part.
+    const vv = window.visualViewport;
+    if (vv) {
+      const relayout = () => {
+        const kb = Math.max(0, innerHeight - vv.height - vv.offsetTop);
+        this.qPanel.style.top = kb > 40 ? `${Math.max(90, vv.height * 0.42)}px` : '50%';
+      };
+      vv.addEventListener('resize', relayout);
+      vv.addEventListener('scroll', relayout);
+    }
   }
 
   get active(): boolean { return this.phase !== 'off'; }
@@ -265,6 +288,7 @@ export class BossFight {
 
   /** Put the question on screen; onSubmit fires exactly once (empty = timeout). */
   askQuestion(text: string, deadlineS: number, onSubmit: (answer: string) => void): void {
+    this.sfx.panel();
     this.qText.textContent = text;
     this.qInput.value = '';
     this.qInput.disabled = this.qGo.disabled = false;
@@ -295,6 +319,7 @@ export class BossFight {
 
   /** The verdict lands: flash it, then the rocket cinematic settles the score. */
   applyVerdict(correct: boolean, expected: string, line: string): void {
+    this.sfx.verdict(correct);
     this.qText.textContent = correct ? '✓ CORRECT' : `✗ WRONG — the answer: ${expected}`;
     this.qText.style.color = correct ? '#4e9a06' : '#e4574f';
     this.say(line);
@@ -312,6 +337,7 @@ export class BossFight {
         this.player.rot = d;
         this.cineTarget.set(boss.x, IRS_ARENA.floorY + 1.4, boss.z);
         this.cine = 'playerShot';
+        this.sfx.rocket();
         this.fx.rocketLaunch(
           this.tmpA.set(this.player.pos.x + Math.sin(d) * 0.5, this.player.pos.y + 1.2, this.player.pos.z + Math.cos(d) * 0.5),
           this.cineTarget, 1.15);
@@ -320,6 +346,7 @@ export class BossFight {
         this.arena.boss.recoil();
         this.cineTarget.set(this.player.pos.x, IRS_ARENA.floorY, this.player.pos.z);
         this.cine = 'markShot';
+        this.sfx.rocket();
         this.fx.rocketLaunch(this.arena.boss.muzzleWorld(this.tmpA), this.cineTarget, 1.15);
       }
     }, 1400);
@@ -345,6 +372,7 @@ export class BossFight {
   damagePlayer(n: number): void {
     if (this.phase === 'off' || this.phase === 'victory' || this.phase === 'audited') return;
     this.myHp = Math.max(0, this.myHp - n);
+    this.sfx.hurt();
     this.vignette.style.opacity = '1';
     setTimeout(() => { if (this.myHp > 0) this.vignette.style.opacity = '0'; }, 380);
     this.shakeT = Math.max(this.shakeT, 0.45);
@@ -365,6 +393,7 @@ export class BossFight {
 
   private win(): void {
     this.phase = 'victory';
+    this.sfx.victory();
     this.fx.laserHide();
     this.fx.rocketAbort();
     this.arena.boss.setMode('defeat');
@@ -378,6 +407,7 @@ export class BossFight {
 
   private lose(): void {
     this.phase = 'audited';
+    this.sfx.defeat();
     this.fx.laserHide();
     this.fx.rocketAbort();
     this.fx.gibs(this.player.pos);
@@ -539,7 +569,8 @@ export class BossFight {
         this.fireAcc -= 1;
         const hitMark = this.aimRay(this.tmpB);
         this.fx.tracer(this.gunMuzzle(this.tmpA), this.tmpB);
-        if (hitMark) this.damageBoss(SMG_DMG);
+        this.sfx.shot();
+        if (hitMark) { this.damageBoss(SMG_DMG); this.sfx.hit(); }
       }
     } else this.fireAcc = 0;
 
@@ -547,9 +578,12 @@ export class BossFight {
       case 'countdown': {
         this.t -= dt;
         boss.ragePower = 1 - Math.max(0, this.t) / COUNTDOWN;
-        this.setBanner(`MARK THE STARTUP ENEMY IS GETTING MAD — ${Math.max(1, Math.ceil(this.t))}`);
+        const tickNo = Math.max(1, Math.ceil(this.t));
+        if (tickNo !== this.lastTick) { this.lastTick = tickNo; this.sfx.tick(false); }
+        this.setBanner(`MARK THE STARTUP ENEMY IS GETTING MAD — ${tickNo}`);
         if (this.t <= 0) {
           boss.setMode('fight');
+          this.sfx.tick(true);
           this.setBanner('THE ROAST COMMENCES');
           setTimeout(() => { if (this.phase !== 'countdown') this.banner.style.display = 'none'; }, 1400);
           this.shakeT = 0.4;
@@ -575,6 +609,7 @@ export class BossFight {
           this.lockedPoint.copy(this.aimPoint);
           this.phase = 'lock';
           this.t = LOCK_T;
+          this.sfx.lock();
         }
         break;
       }
@@ -585,6 +620,7 @@ export class BossFight {
           this.fx.laserHide();
           boss.recoil();
           this.fx.rocketLaunch(boss.muzzleWorld(this.tmpA), this.lockedPoint, FLIGHT_T);
+          this.sfx.rocket();
           this.shakeT = Math.max(this.shakeT, 0.18);
           this.phase = 'flight';
         }
@@ -616,6 +652,7 @@ export class BossFight {
     const landed = this.fx.update(dt);
     if (landed && this.cine !== 'none') {
       this.fx.explode(this.cineTarget);
+      this.sfx.explosion(true);
       this.shakeT = Math.max(this.shakeT, 0.55);
       if (this.cine === 'playerShot') {
         this.damageBoss(REWARD_DMG);
@@ -633,6 +670,7 @@ export class BossFight {
     }
     if (landed && this.phase === 'flight') {
       this.fx.explode(this.lockedPoint);
+      this.sfx.explosion(false);
       this.shakeT = Math.max(this.shakeT, 0.5);
       const d = Math.hypot(this.player.pos.x - this.lockedPoint.x, this.player.pos.z - this.lockedPoint.z);
       if (d < BLAST_R && !this.coverBetween(this.lockedPoint, this.player.pos)) {

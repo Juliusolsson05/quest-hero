@@ -33,6 +33,9 @@ export class Bubbles {
    *  instead of vanishing when the camera turns away. */
   readonly pinned = new Set<string>();
 
+  /** Fired when a finished line lands (commit/ambient) — main pops the synth. */
+  onCommit: () => void = () => {};
+
   constructor() {
     this.layer = document.createElement('div');
     this.layer.id = 'bubbles';
@@ -92,6 +95,7 @@ export class Bubbles {
     else { // commit | ambient
       b.full = text + (EMOTION_ORNAMENT[emotion] && !/[✨💧❗💭]$/.test(text) ? ` ${EMOTION_ORNAMENT[emotion]}` : '');
       if (mode === 'ambient') { b.shown = b.full.length; b.text.textContent = b.full; }
+      this.onCommit();
       b.done = true;
       b.expireAt = performance.now() + Math.max(3200, b.full.length * 55);
       if (emotion === 'shock') {

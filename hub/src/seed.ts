@@ -110,20 +110,6 @@ export async function seedTrueForge(): Promise<void> {
     ));
   }
 
-  if (process.env.TAVILY_API_KEY) {
-    jobs.push(put(
-      '/api/v1/settings/mcp-servers',
-      {
-        type: 'remote',
-        name: 'tavily',
-        url: 'https://mcp.tavily.com/mcp',
-        description: 'Tavily web search — word from beyond the village.',
-        auth: { type: 'header', headers: { Authorization: `Bearer ${process.env.TAVILY_API_KEY}` } },
-      },
-      'mcp tavily',
-    ));
-  }
-
   if (jobs.length === 0) return;
   console.log(`[seed] provisioning TrueForge at ${CONFIG.trueforgeBase} (${jobs.length} resources)`);
   await Promise.all(jobs);

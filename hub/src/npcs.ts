@@ -73,9 +73,8 @@ const WORLD_RULE =
 const WEB_TOOLS_RULE =
   ' YOUR TOOLS: real tools are attached to this conversation. Your window on the wider ' +
   'world is bright-data, the Bright Data courier network: search_engine brings fresh ' +
-  'word from the live web, scrape_as_markdown reads a single page in full (another web ' +
-  'search tool named tavily, exa, or parallel-web may stand in when the courier is ' +
-  'away). You may also see sf-guide, a live San Francisco city-data service (its tools ' +
+  'word from the live web, scrape_as_markdown reads a single page in full. ' +
+  'You may also see sf-guide, a live San Francisco city-data service (its tools ' +
   'start with sf_: current weather and fog, earthquakes, tides, bike share, city ' +
   'datasets), and wall-street, a live market/finance data service. ' +
   'Hard rules: (1) any question about the real world beyond the village — news, prices, ' +

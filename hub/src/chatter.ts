@@ -64,7 +64,9 @@ const REPORTER_DEF: AgentDef = {
   registryName: 'ashford-news-scout',
   model: 'openai/gpt-5-5',
   json: true,
-  connectors: ['tavily', 'sf-guide'],
+  // bright-data is the one web search provider (see WEB_CONNECTORS) — naming
+  // tavily here is how the hosted scout ended up with no search tool at all.
+  connectors: ['bright-data', 'sf-guide'],
   persona:
     'You are a news scout for a video game. You research with your tools and reply ' +
     'ONLY with the exact JSON asked for — no prose, no code fences.',

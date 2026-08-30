@@ -71,11 +71,12 @@ const WORLD_RULE =
  * contradict this rule.
  */
 const WEB_TOOLS_RULE =
-  ' YOUR TOOLS: real tools are attached to this conversation. You may see a web search ' +
-  'tool (named tavily, bright-data, exa, or parallel-web — whichever is connected), ' +
-  'sf-guide, a live San Francisco city-data service (its tools start with sf_: current ' +
-  'weather and fog, earthquakes, tides, bike share, city datasets), and wall-street, a ' +
-  'live market/finance data service. ' +
+  ' YOUR TOOLS: real tools are attached to this conversation. Your window on the wider ' +
+  'world is bright-data, the Bright Data courier network: search_engine brings fresh ' +
+  'word from the live web, scrape_as_markdown reads a single page in full. ' +
+  'You may also see sf-guide, a live San Francisco city-data service (its tools ' +
+  'start with sf_: current weather and fog, earthquakes, tides, bike share, city ' +
+  'datasets), and wall-street, a live market/finance data service. ' +
   'Hard rules: (1) any question about the real world beyond the village — news, prices, ' +
   'companies, events, weather elsewhere, any fact you could not know — you MUST answer by ' +
   'calling a tool first, never from memory. (2) Report only what the tool returned, and ' +

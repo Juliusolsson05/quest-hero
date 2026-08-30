@@ -68,7 +68,9 @@ export async function resolveModel(preferred?: string): Promise<string> {
 
 /** Connectors a webAccess agent gets, in preference order, matched against
  *  what TrueForge actually has configured AND authenticated. */
-export const WEB_CONNECTORS = ['bright-data', 'tavily', 'exa', 'parallel-web', 'sf-guide', 'wall-street'];
+// Bright Data is the ONE web search provider, by decision — a second provider
+// that happens to be unconfigured reads as "web search unavailable" in-game.
+export const WEB_CONNECTORS = ['bright-data', 'sf-guide', 'wall-street'];
 
 let connectorCache: { at: number; names: string[] } | null = null;
 

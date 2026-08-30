@@ -40,7 +40,7 @@ function fail(e: unknown) {
   };
 }
 
-function buildServer(): McpServer {
+export function buildServer(): McpServer {
   const server = new McpServer({ name: 'sf-guide', version: '0.1.0' });
 
   server.registerTool(
@@ -216,6 +216,8 @@ app.delete('/mcp', (_req, res) => res.status(405).json({ error: 'stateless serve
 app.get('/health', (_req, res) =>
   res.json({ ok: true, sources: SOURCES.length, usable: USABLE.length }));
 
-app.listen(PORT, () => {
+// On Vercel this module is imported for buildServer() by the /api/mcp/* function
+// wrappers — binding a port there would crash the function runtime.
+if (!process.env.VERCEL) app.listen(PORT, () => {
   console.log(`sf-guide MCP on http://localhost:${PORT}/mcp  (${USABLE.length} sources)`);
 });

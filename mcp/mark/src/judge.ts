@@ -1,4 +1,4 @@
-import { QUESTIONS, type Rule, type TriviaQuestion } from './sources';
+import { QUESTIONS, type Rule, type TriviaQuestion } from './sources.js';
 
 /**
  * Deterministic judging — the whole point of this server. The model never

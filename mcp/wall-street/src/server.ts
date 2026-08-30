@@ -37,7 +37,7 @@ function fail(e: unknown) {
   };
 }
 
-function buildServer(): McpServer {
+export function buildServer(): McpServer {
   const server = new McpServer({ name: 'wall-street', version: '0.1.0' });
 
   server.registerTool(
@@ -180,6 +180,8 @@ app.delete('/mcp', (_req, res) => res.status(405).json({ error: 'stateless serve
 
 app.get('/health', (_req, res) => res.json({ ok: true, tools: 7, keys_required: 0 }));
 
-app.listen(PORT, () => {
+// On Vercel this module is imported for buildServer() by the /api/mcp/* function
+// wrappers — binding a port there would crash the function runtime.
+if (!process.env.VERCEL) app.listen(PORT, () => {
   console.log(`wall-street MCP on http://localhost:${PORT}/mcp  (7 tools, no API keys)`);
 });

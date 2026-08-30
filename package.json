@@ -1,0 +1,11 @@
+{
+  "name": "quest-hero-cloud",
+  "private": true,
+  "type": "module",
+  "description": "Root glue for the Vercel deployment: /api/mcp/* function deps. The game and hub keep their own packages; this exists only so Vercel functions can bundle the mcp/ servers. Contract: docs/plans/cloud-deploy.md",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.22.0",
+    "express": "^5.1.0",
+    "zod": "^3.25.76"
+  }
+}

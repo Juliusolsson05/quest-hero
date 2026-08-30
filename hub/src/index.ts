@@ -17,6 +17,7 @@ import { CONFIG } from './config';
 import { registerAgents, talk } from './dialogue';
 import { startIngest } from './ingest';
 import { island } from '../../shared/island';
+import { seedTrueForge } from './seed';
 import { engagePlayer, startSim } from './sim';
 import {
   acceptQuest,
@@ -108,7 +109,12 @@ server.listen(CONFIG.port, () => {
   console.log(`[hub] TrueForge at ${CONFIG.trueforgeBase} · GitHub repo ${CONFIG.githubRepo}`);
   startSim();
   startIngest();
-  startChatter();
-  // Every villager becomes a named agent in the TrueForge Agent Library.
-  void registerAgents();
+  // Seed the harness first (models + MCP connectors from env, no-op locally):
+  // BOTH registrations — the villagers and chatter's scout/writers — build
+  // their connector lists from what TrueForge has configured, so starting
+  // chatter before the seed would register the scout against a stale list.
+  void seedTrueForge().then(() => {
+    startChatter();
+    void registerAgents();
+  });
 });

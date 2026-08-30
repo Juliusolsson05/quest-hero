@@ -51,6 +51,16 @@ export class IrsEncounter {
   /** Where the public thinks you are during the audit: the doorstep. */
   get doorstep(): THREE.Vector3 { return this.door; }
 
+  /** Knock sound hook (main wires the synth). */
+  sfxKnock: () => void = () => {};
+
+  /** Wire the fight's sound hooks — main owns the synth. */
+  setFightSfx(sfx: BossFight['sfx']): void { this.fight.sfx = sfx; }
+
+  get fightActive(): boolean { return this.fight.active; }
+  get fightFrozen(): boolean { return this.fight.frozen; }
+  get bossDesperate(): boolean { return this.fight.desperate; }
+
   /** Mark's voice — main wires this to the town bubble system so his trash
    *  talk floats over his head exactly like any citizen's speech. */
   speak: (text: string) => void = () => {};
@@ -210,6 +220,7 @@ export class IrsEncounter {
     if (!this.nearDoor()) return false;
     if (!this.knocked) {
       this.knocked = true;
+      this.sfxKnock();
       this.toast('a voice from inside: "COME IN. BRING YOUR PITCH DECK."', '🥊');
     } else if (!this.seat.tryClaim()) {
       this.toast('Mark is mid-audit with another founder — wait your turn', '🥊');

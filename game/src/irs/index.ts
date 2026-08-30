@@ -3,6 +3,10 @@ import type { ServerFrame } from '../../../shared/protocol';
 import type { Island } from '../../../shared/protocol';
 import type { Player } from '../player';
 import { IrsArena, IRS_ARENA } from './arena';
+
+/** The chamber's footprint, for main to register as a multiplayer privacy
+ *  zone — remote players inside it are never rendered. */
+export const ARENA_PRIVACY_ZONE = IRS_ARENA.bounds;
 import { BossFight } from './boss-fight';
 
 /**
@@ -29,6 +33,23 @@ export class IrsEncounter {
   /** Fired entering/leaving the chamber — main hides the other heroes: the
    *  roast is single-player, whoever else is online. */
   onSeclusion: (secluded: boolean) => void = () => {};
+
+  /** The one-fighter-at-a-time seat — main wires it to multiplayer room
+   *  state; the defaults keep solo and hubless play always allowed. */
+  seat = {
+    tryClaim: (): boolean => true,
+    heartbeat: (): void => {},
+    release: (): void => {},
+  };
+  private seatHbT = 0;
+
+  /** True while the player is inside the chamber — main substitutes the
+   *  broadcast pose so other players see them waiting at the office door,
+   *  never standing in a private arena. */
+  get secluded(): boolean { return this.inArena; }
+
+  /** Where the public thinks you are during the audit: the doorstep. */
+  get doorstep(): THREE.Vector3 { return this.door; }
 
   /** Mark's voice — main wires this to the town bubble system so his trash
    *  talk floats over his head exactly like any citizen's speech. */
@@ -160,6 +181,7 @@ export class IrsEncounter {
       this.knocked = false;
       this.player.setArena(null);
       this.player.teleport(new THREE.Vector3(this.door.x + 0.8, this.door.y, this.door.z));
+      this.seat.release();
       this.onSeclusion(false);
       if (this.fireBtn) this.fireBtn.style.display = 'none';
       this.toast(line, icon);
@@ -189,6 +211,8 @@ export class IrsEncounter {
     if (!this.knocked) {
       this.knocked = true;
       this.toast('a voice from inside: "COME IN. BRING YOUR PITCH DECK."', '🥊');
+    } else if (!this.seat.tryClaim()) {
+      this.toast('Mark is mid-audit with another founder — wait your turn', '🥊');
     } else this.enter();
     return true;
   }
@@ -200,6 +224,8 @@ export class IrsEncounter {
 
       // The exam schedule and the insult schedule, both only while the
       // shooter is live and THIS player's fight is not already paused.
+      this.seatHbT -= dt;
+      if (this.seatHbT <= 0) { this.seatHbT = 4; this.seat.heartbeat(); }
       if (this.fight.inCombat && !this.fight.frozen) {
         this.roundT -= dt;
         this.tauntT -= dt;

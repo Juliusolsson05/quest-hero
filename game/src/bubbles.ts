@@ -27,10 +27,12 @@ export class Bubbles {
   private readonly layer: HTMLDivElement;
   private readonly bubbles = new Map<string, Bubble>();
   private readonly v = new THREE.Vector3();
+  private readonly camDir = new THREE.Vector3();
+  private readonly toAnchor = new THREE.Vector3();
 
-  /** Speakers exempt from the distance filter (the boss): their bubble stays
-   *  readable across the whole arena, and docks to the top of the screen
-   *  instead of vanishing when the camera turns away. */
+  /** Speakers exempt from the distance filter (the boss): the bubble hangs
+   *  over their head at ANY range — but like every bubble, it hides when
+   *  the camera faces away. No screen-docking; that broke attribution. */
   readonly pinned = new Set<string>();
 
   /** Fired when a finished line lands (commit/ambient) — main pops the synth. */
@@ -57,9 +59,6 @@ export class Bubbles {
       .bub .b-text { white-space: pre-wrap; word-break: break-word; }
       .bub.think .b-text::after { content: "…"; animation: dots 1.1s steps(4) infinite; }
       .bub.emo-shock { animation: bub-shake .3s; }
-      .bub.docked { position: fixed; left: 50% !important; top: 112px !important;
-        transform: translate(-50%, 0) !important; }
-      .bub.docked::after { display: none; } /* no tail — it must not point at anyone */
       .bub.fade { opacity: 0; }
       @keyframes bub-in { from { transform: translate(-50%,-100%) scale(.6); opacity: 0; } }
       @keyframes dots { 0% { content: ""; } 33% { content: "·"; } 66% { content: "··"; } 100% { content: "···"; } }
@@ -135,25 +134,19 @@ export class Bubbles {
       const anchor = anchorFor(who);
       if (!anchor) { b.root.style.display = 'none'; continue; }
       const pinned = this.pinned.has(who);
+      // NDC z is unreliable for points behind the camera (negative-w flip);
+      // "behind" is a plain dot product against where the camera looks.
+      camera.getWorldDirection(this.camDir);
+      this.toAnchor.subVectors(anchor, camera.position);
+      const behind = this.toAnchor.dot(this.camDir) < 0;
       this.v.copy(anchor).project(camera);
-      const behind = this.v.z > 1;
       const dist = camera.position.distanceTo(anchor);
-      if (!pinned && (behind || dist > 26)) { b.root.style.display = 'none'; continue; }
+      // facing away hides EVERY bubble; distance only hides unpinned ones
+      if (behind || (!pinned && dist > 26)) { b.root.style.display = 'none'; continue; }
       b.root.style.display = '';
-      if (pinned && (behind || this.v.y > 0.9 || this.v.y < -0.9 || this.v.x > 1 || this.v.x < -1)) {
-        // The speaker is off-screen; his words are not. Dock as a subtitle
-        // pinned under his health bar — tail-less, so it cannot look like it
-        // belongs to whoever happens to stand mid-screen.
-        b.root.classList.add('docked');
-        b.root.style.opacity = '';
-        continue;
-      }
-      b.root.classList.remove('docked');
       b.root.style.left = `${(this.v.x * 0.5 + 0.5) * innerWidth}px`;
       b.root.style.top = `${(-this.v.y * 0.5 + 0.5) * innerHeight}px`;
-      const s = pinned
-        ? THREE.MathUtils.clamp(1.12 - dist * 0.022, 0.95, 1.05)
-        : THREE.MathUtils.clamp(1.12 - dist * 0.022, 0.72, 1.05);
+      const s = THREE.MathUtils.clamp(1.12 - dist * 0.022, pinned ? 0.92 : 0.72, 1.05);
       b.root.style.transform = `translate(-50%, -100%) scale(${s})`;
       b.root.style.opacity = !pinned && dist > 20 ? '0.35' : '';
     }
